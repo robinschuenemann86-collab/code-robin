@@ -6,6 +6,8 @@ import { initStore } from './store'
 import { registerEntryHandlers } from './entries'
 import { registerCategoryHandlers } from './categories'
 import { registerScannerHandlers } from './scanner'
+import { registerStatsHandlers } from './stats'
+import { closeDanglingSessions } from './playtime'
 import { registerIconProtocolScheme, registerIconProtocolHandler } from './iconProtocol'
 
 registerIconProtocolScheme()
@@ -65,9 +67,11 @@ app.whenReady().then(() => {
 
   registerIconProtocolHandler()
   initStore()
+  closeDanglingSessions()
   registerEntryHandlers(() => mainWindow)
   registerCategoryHandlers()
   registerScannerHandlers()
+  registerStatsHandlers()
 
   createWindow()
 

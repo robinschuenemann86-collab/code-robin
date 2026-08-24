@@ -1,6 +1,39 @@
 @import 'tailwindcss';
 
+@theme {
+  --color-base: #0a0b10;
+  --color-panel: #12141d;
+  --color-panel-hover: #1a1d29;
+  --color-panel-active: #202544;
+  --color-border: #23273a;
+  --color-text: #eceef5;
+  --color-text-muted: #888ca3;
+  --color-cyan: #33e1ff;
+  --color-pink: #ff3f9e;
+  --color-violet: #a78bfa;
+  --color-amber: #fbbf6b;
+}
+
 body {
   margin: 0;
   overflow: hidden;
+}
+
+.glow-cyan {
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-cyan) 60%, transparent), 0 0 16px
+    color-mix(in srgb, var(--color-cyan) 35%, transparent);
+}
+
+.glow-pink {
+  box-shadow: 0 0 16px color-mix(in srgb, var(--color-pink) 45%, transparent);
+}
+
+.divider {
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--color-cyan) 25%, var(--color-border)),
+    transparent
+  );
 }

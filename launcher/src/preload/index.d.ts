@@ -1,5 +1,6 @@
 import type { Entry, Category } from '../main/store'
 import type { Candidate } from '../main/scanner'
+import type { EntryStats } from '../main/stats'
 
 export interface LauncherApi {
   listEntries: () => Promise<Entry[]>
@@ -8,6 +9,7 @@ export interface LauncherApi {
   setEntryCategory: (id: string, categoryId: string) => Promise<Entry[]>
   removeEntry: (id: string) => Promise<Entry[]>
   launchEntry: (id: string) => Promise<void>
+  toggleFavorite: (id: string) => Promise<Entry[]>
 
   listCategories: () => Promise<Category[]>
   addCategory: (name: string) => Promise<Category[]>
@@ -16,6 +18,8 @@ export interface LauncherApi {
 
   scan: () => Promise<Candidate[]>
   importCandidates: (candidates: Candidate[]) => Promise<Entry[]>
+
+  listStats: () => Promise<EntryStats[]>
 }
 
 declare global {

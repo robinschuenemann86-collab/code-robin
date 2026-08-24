@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type ReactElement } from 'react'
 import type { Candidate } from '../types'
 import { EntryIcon } from './EntryIcon'
+import { IconAlertTriangle, IconCheck, IconDownload, IconX } from './icons'
 
 interface ScannerDialogProps {
   onClose: () => void
@@ -27,6 +28,7 @@ export function ScannerDialog({ onClose, onImported }: ScannerDialogProps): Reac
     () => candidates.filter((c) => c.source === 'steam'),
     [candidates]
   )
+  const epicCandidates = useMemo(() => candidates.filter((c) => c.source === 'epic'), [candidates])
   const registryCandidates = useMemo(
     () => candidates.filter((c) => c.source === 'registry'),
     [candidates]
@@ -53,12 +55,12 @@ export function ScannerDialog({ onClose, onImported }: ScannerDialogProps): Reac
     if (items.length === 0) return null
     return (
       <div className="flex flex-col gap-1">
-        <h3 className="text-xs font-medium uppercase tracking-wide text-neutral-500">{title}</h3>
+        <h3 className="text-xs font-medium uppercase tracking-widest text-text-muted">{title}</h3>
         {items.map((candidate) => (
           <label
             key={candidate.key}
-            className={`flex items-center gap-3 rounded-md px-2 py-1.5 ${
-              candidate.alreadyImported ? 'opacity-40' : 'hover:bg-neutral-900'
+            className={`flex items-center gap-3 rounded-lg px-2 py-1.5 ${
+              candidate.alreadyImported ? 'opacity-40' : 'hover:bg-panel-hover'
             }`}
           >
             <input
@@ -66,14 +68,18 @@ export function ScannerDialog({ onClose, onImported }: ScannerDialogProps): Reac
               disabled={candidate.alreadyImported}
               checked={selectedKeys.has(candidate.key)}
               onChange={() => toggle(candidate.key)}
+              className="accent-cyan"
             />
             <EntryIcon iconHash={candidate.iconHash} className="h-8 w-8" />
             <span className="flex-1 truncate text-sm">{candidate.name}</span>
             {candidate.alreadyImported && (
-              <span className="text-xs text-neutral-500">bereits vorhanden</span>
+              <IconCheck className="h-4 w-4 shrink-0 text-text-muted" title="Bereits vorhanden" />
             )}
             {!candidate.alreadyImported && !candidate.likelyRelevant && (
-              <span className="text-xs text-neutral-500">evtl. kein Spiel/Programm</span>
+              <IconAlertTriangle
+                className="h-4 w-4 shrink-0 text-amber"
+                title="Evtl. kein Spiel/Programm"
+              />
             )}
           </label>
         ))}
@@ -82,39 +88,36 @@ export function ScannerDialog({ onClose, onImported }: ScannerDialogProps): Reac
   }
 
   return (
-    <div className="fixed inset-0 z-10 flex items-center justify-center bg-black/60">
-      <div className="flex max-h-[80vh] w-[32rem] flex-col gap-4 rounded-lg border border-neutral-800 bg-neutral-950 p-6">
+    <div className="fixed inset-0 z-10 flex items-center justify-center bg-black/70">
+      <div className="flex max-h-[80vh] w-[32rem] flex-col gap-4 rounded-xl border border-border bg-base p-6 shadow-2xl">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold">Programme suchen</h2>
-          <button onClick={onClose} className="text-neutral-500 hover:text-neutral-300">
-            ✕
+          <button onClick={onClose} className="text-text-muted hover:text-cyan" title="Schließen">
+            <IconX className="h-4 w-4" />
           </button>
         </div>
 
         {loading ? (
-          <p className="text-sm text-neutral-500">Durchsuche Registry und Steam-Bibliotheken …</p>
+          <p className="text-sm text-text-muted">Durchsuche …</p>
         ) : candidates.length === 0 ? (
-          <p className="text-sm text-neutral-500">Es wurden keine neuen Programme gefunden.</p>
+          <p className="text-sm text-text-muted">Nichts gefunden.</p>
         ) : (
           <div className="flex flex-col gap-4 overflow-y-auto">
             {renderGroup('Steam-Spiele', steamCandidates)}
+            {renderGroup('Epic-Spiele', epicCandidates)}
             {renderGroup('Installierte Programme', registryCandidates)}
           </div>
         )}
 
-        <div className="mt-auto flex justify-end gap-2 border-t border-neutral-800 pt-4">
-          <button
-            onClick={onClose}
-            className="rounded-md border border-neutral-800 px-4 py-2 text-sm text-neutral-300 hover:bg-neutral-900"
-          >
-            Abbrechen
-          </button>
+        <div className="mt-auto flex justify-end border-t border-border pt-4">
           <button
             onClick={handleImport}
             disabled={loading || importing || selectedKeys.size === 0}
-            className="rounded-md bg-neutral-100 px-4 py-2 text-sm font-medium text-neutral-900 hover:bg-white disabled:opacity-40"
+            title="Importieren"
+            className="glow-pink flex items-center gap-2 rounded-lg bg-pink px-4 py-2 text-sm font-medium text-white transition hover:brightness-110 disabled:opacity-40 disabled:shadow-none"
           >
-            {importing ? 'Importiere …' : `${selectedKeys.size} auswählen und importieren`}
+            <IconDownload className="h-4 w-4" />
+            {importing ? '…' : selectedKeys.size}
           </button>
         </div>
       </div>

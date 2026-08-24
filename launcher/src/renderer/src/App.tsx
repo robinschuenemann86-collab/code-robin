@@ -1,40 +1,57 @@
 import { useEffect, useMemo, useState, type ReactElement } from 'react'
-import type { Category, Entry, ViewMode } from './types'
+import type { Category, Entry, EntryStats, ViewMode } from './types'
 import { EntryIcon } from './components/EntryIcon'
 import { Sidebar } from './components/Sidebar'
 import { DetailPanel } from './components/DetailPanel'
 import { ScannerDialog } from './components/ScannerDialog'
+import { StatsDialog } from './components/StatsDialog'
+import { IconClock, IconPlus, IconSearch, IconStar, IconTrash } from './components/icons'
 
 function App(): ReactElement {
   const [entries, setEntries] = useState<Entry[]>([])
   const [categories, setCategories] = useState<Category[]>([])
+  const [stats, setStats] = useState<EntryStats[]>([])
   const [loading, setLoading] = useState(true)
   const [status, setStatus] = useState('')
   const [scannerOpen, setScannerOpen] = useState(false)
+  const [statsOpen, setStatsOpen] = useState(false)
 
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null)
+  const [favoritesOnly, setFavoritesOnly] = useState(false)
   const [viewMode, setViewMode] = useState<ViewMode>('grid')
   const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null)
 
   useEffect(() => {
-    Promise.all([window.api.listEntries(), window.api.listCategories()]).then(
-      ([loadedEntries, loadedCategories]) => {
-        setEntries(loadedEntries)
-        setCategories(loadedCategories)
-        setLoading(false)
-      }
-    )
+    Promise.all([
+      window.api.listEntries(),
+      window.api.listCategories(),
+      window.api.listStats()
+    ]).then(([loadedEntries, loadedCategories, loadedStats]) => {
+      setEntries(loadedEntries)
+      setCategories(loadedCategories)
+      setStats(loadedStats)
+      setLoading(false)
+    })
   }, [])
+
+  // Spielzeit läuft im Hintergrund weiter (Prozess-Polling im Main-Prozess),
+  // daher hier frisch nachladen statt die Werte vom App-Start zu behalten.
+  useEffect(() => {
+    if (selectedEntryId || statsOpen) {
+      window.api.listStats().then(setStats)
+    }
+  }, [selectedEntryId, statsOpen])
 
   const filteredEntries = useMemo(() => {
     const query = searchQuery.trim().toLowerCase()
     return entries.filter((entry) => {
+      if (favoritesOnly && !entry.favorite) return false
       if (selectedCategoryId !== null && entry.category !== selectedCategoryId) return false
       if (query && !entry.name.toLowerCase().includes(query)) return false
       return true
     })
-  }, [entries, searchQuery, selectedCategoryId])
+  }, [entries, searchQuery, selectedCategoryId, favoritesOnly])
 
   const selectedEntry = entries.find((e) => e.id === selectedEntryId) ?? null
 
@@ -51,6 +68,10 @@ function App(): ReactElement {
     } catch (error) {
       setStatus(`Fehler beim Starten: ${error instanceof Error ? error.message : String(error)}`)
     }
+  }
+
+  async function handleToggleFavorite(entry: Entry): Promise<void> {
+    setEntries(await window.api.toggleFavorite(entry.id))
   }
 
   async function handleDelete(entry: Entry): Promise<void> {
@@ -137,27 +158,37 @@ function App(): ReactElement {
   }
 
   return (
-    <div className="flex h-screen flex-col bg-neutral-950 text-neutral-100">
-      <header className="flex items-center justify-between border-b border-neutral-800 px-6 py-4">
+    <div className="flex h-screen flex-col bg-base text-text">
+      <header className="flex items-center justify-between px-8 py-5">
         <div>
-          <h1 className="text-lg font-semibold">Launcher</h1>
-          <p className="text-sm text-neutral-400">{entries.length} Programme</p>
+          <h1 className="text-lg font-semibold tracking-tight">Launcher</h1>
+          <p className="text-sm text-text-muted">{entries.length} Programme</p>
         </div>
         <div className="flex gap-2">
           <button
-            onClick={() => setScannerOpen(true)}
-            className="rounded-md border border-neutral-800 px-4 py-2 text-sm text-neutral-300 hover:bg-neutral-900"
+            onClick={() => setStatsOpen(true)}
+            title="Statistik"
+            className="rounded-lg border border-border bg-panel p-2.5 text-text transition hover:border-cyan/50 hover:text-cyan"
           >
-            Programme suchen
+            <IconClock />
+          </button>
+          <button
+            onClick={() => setScannerOpen(true)}
+            title="Programme suchen"
+            className="rounded-lg border border-border bg-panel p-2.5 text-text transition hover:border-cyan/50 hover:text-cyan"
+          >
+            <IconSearch />
           </button>
           <button
             onClick={handleAdd}
-            className="rounded-md bg-neutral-100 px-4 py-2 text-sm font-medium text-neutral-900 hover:bg-white"
+            title="Programm hinzufügen"
+            className="glow-pink rounded-lg bg-pink p-2.5 text-white transition hover:brightness-110"
           >
-            + Programm hinzufügen
+            <IconPlus />
           </button>
         </div>
       </header>
+      <div className="divider" />
 
       <div className="flex min-h-0 flex-1">
         <Sidebar
@@ -169,23 +200,28 @@ function App(): ReactElement {
           onSearchChange={setSearchQuery}
           viewMode={viewMode}
           onViewModeChange={setViewMode}
+          favoritesOnly={favoritesOnly}
+          onFavoritesOnlyChange={setFavoritesOnly}
           onAddCategory={handleAddCategory}
           onRenameCategory={handleRenameCategory}
           onRemoveCategory={handleRemoveCategory}
         />
 
-        <main className="flex-1 overflow-y-auto p-6">
+        <main className="flex-1 overflow-y-auto p-8">
           {loading ? (
-            <p className="text-sm text-neutral-500">Lade …</p>
+            <p className="text-sm text-text-muted">Lade …</p>
           ) : entries.length === 0 ? (
-            <div className="flex h-full flex-col items-center justify-center gap-2 text-neutral-500">
-              <p>Noch keine Programme hinzugefügt.</p>
-              <p className="text-sm">Klicke oben rechts auf &quot;+ Programm hinzufügen&quot;.</p>
+            <div className="flex h-full flex-col items-center justify-center gap-3 text-text-muted">
+              <IconPlus className="h-8 w-8" />
+              <p className="text-sm">Noch keine Programme</p>
             </div>
           ) : filteredEntries.length === 0 ? (
-            <div className="flex h-full flex-col items-center justify-center gap-2 text-neutral-500">
-              <p>Keine Treffer.</p>
-              <button onClick={resetFilters} className="text-sm underline hover:text-neutral-300">
+            <div className="flex h-full flex-col items-center justify-center gap-3 text-text-muted">
+              <IconSearch className="h-8 w-8" />
+              <button
+                onClick={resetFilters}
+                className="text-sm text-cyan underline hover:brightness-125"
+              >
                 Filter zurücksetzen
               </button>
             </div>
@@ -196,21 +232,35 @@ function App(): ReactElement {
                   key={entry.id}
                   onClick={() => setSelectedEntryId(entry.id)}
                   onDoubleClick={() => handleLaunch(entry)}
-                  className={`group relative flex cursor-pointer flex-col items-center gap-2 rounded-lg border p-4 text-center transition ${
+                  className={`group relative flex cursor-pointer flex-col items-center gap-2 rounded-xl border p-4 text-center transition ${
                     selectedEntryId === entry.id
-                      ? 'border-neutral-500 bg-neutral-800'
-                      : 'border-neutral-800 bg-neutral-900 hover:border-neutral-600 hover:bg-neutral-800'
+                      ? 'glow-cyan border-cyan/60 bg-panel-active'
+                      : 'border-border bg-panel hover:border-cyan/30 hover:bg-panel-hover'
                   }`}
                 >
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleToggleFavorite(entry)
+                    }}
+                    title="Favorit"
+                    className={`absolute left-2 top-2 p-1 ${
+                      entry.favorite
+                        ? 'block text-amber'
+                        : 'hidden text-text-muted hover:text-amber group-hover:block'
+                    }`}
+                  >
+                    <IconStar className="h-3.5 w-3.5" filled={entry.favorite} />
+                  </button>
                   <button
                     onClick={(e) => {
                       e.stopPropagation()
                       handleDelete(entry)
                     }}
                     title="Entfernen"
-                    className="absolute right-2 top-2 hidden rounded bg-neutral-800 px-1.5 py-0.5 text-xs hover:bg-neutral-700 group-hover:block"
+                    className="absolute right-2 top-2 hidden rounded-md bg-panel-hover p-1 hover:bg-panel-active group-hover:block"
                   >
-                    🗑️
+                    <IconTrash className="h-3.5 w-3.5" />
                   </button>
                   <EntryIcon iconHash={entry.iconHash} />
                   <span className="truncate text-sm font-medium">{entry.name}</span>
@@ -224,26 +274,40 @@ function App(): ReactElement {
                   key={entry.id}
                   onClick={() => setSelectedEntryId(entry.id)}
                   onDoubleClick={() => handleLaunch(entry)}
-                  className={`group flex cursor-pointer items-center gap-3 rounded-md border px-3 py-2 transition ${
+                  className={`group flex cursor-pointer items-center gap-3 rounded-lg border px-3 py-2 transition ${
                     selectedEntryId === entry.id
-                      ? 'border-neutral-500 bg-neutral-800'
-                      : 'border-transparent hover:bg-neutral-900'
+                      ? 'glow-cyan border-cyan/60 bg-panel-active'
+                      : 'border-transparent hover:bg-panel-hover'
                   }`}
                 >
                   <EntryIcon iconHash={entry.iconHash} className="h-8 w-8" />
                   <span className="flex-1 truncate text-sm font-medium">{entry.name}</span>
-                  <span className="text-xs text-neutral-500">
+                  <span className="text-xs text-text-muted">
                     {categories.find((c) => c.id === entry.category)?.name ?? 'Unsortiert'}
                   </span>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleToggleFavorite(entry)
+                    }}
+                    title="Favorit"
+                    className={`p-1 ${
+                      entry.favorite
+                        ? 'text-amber'
+                        : 'hidden text-text-muted hover:text-amber group-hover:inline-flex'
+                    }`}
+                  >
+                    <IconStar className="h-3.5 w-3.5" filled={entry.favorite} />
+                  </button>
                   <button
                     onClick={(e) => {
                       e.stopPropagation()
                       handleDelete(entry)
                     }}
                     title="Entfernen"
-                    className="hidden rounded bg-neutral-800 px-1.5 py-0.5 text-xs hover:bg-neutral-700 group-hover:block"
+                    className="hidden rounded-md bg-panel-hover p-1 hover:bg-panel-active group-hover:block"
                   >
-                    🗑️
+                    <IconTrash className="h-3.5 w-3.5" />
                   </button>
                 </div>
               ))}
@@ -256,9 +320,11 @@ function App(): ReactElement {
             key={selectedEntry.id}
             entry={selectedEntry}
             categories={categories}
+            stats={stats.find((s) => s.entryId === selectedEntry.id) ?? null}
             onLaunch={handleLaunch}
             onRename={handleRename}
             onSetCategory={handleSetCategory}
+            onToggleFavorite={handleToggleFavorite}
             onRemove={handleDelete}
             onClose={() => setSelectedEntryId(null)}
           />
@@ -266,9 +332,10 @@ function App(): ReactElement {
       </div>
 
       {status && (
-        <footer className="border-t border-neutral-800 px-6 py-3 text-sm text-neutral-400">
-          {status}
-        </footer>
+        <>
+          <div className="divider" />
+          <footer className="px-8 py-3 text-sm text-text-muted">{status}</footer>
+        </>
       )}
 
       {scannerOpen && (
@@ -279,6 +346,10 @@ function App(): ReactElement {
             setScannerOpen(false)
           }}
         />
+      )}
+
+      {statsOpen && (
+        <StatsDialog entries={entries} stats={stats} onClose={() => setStatsOpen(false)} />
       )}
     </div>
   )

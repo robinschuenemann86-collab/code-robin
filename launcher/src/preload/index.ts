@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type { Entry, Category } from '../main/store'
 import type { Candidate } from '../main/scanner'
+import type { EntryStats } from '../main/stats'
 
 // Jede Funktion hier entspricht genau einem erlaubten IPC-Kanal.
 // Kein genereller Durchgriff auf ipcRenderer.invoke aus dem Renderer.
@@ -13,6 +14,8 @@ const api = {
     ipcRenderer.invoke('entries:setCategory', id, categoryId),
   removeEntry: (id: string): Promise<Entry[]> => ipcRenderer.invoke('entries:remove', id),
   launchEntry: (id: string): Promise<void> => ipcRenderer.invoke('entries:launch', id),
+  toggleFavorite: (id: string): Promise<Entry[]> =>
+    ipcRenderer.invoke('entries:toggleFavorite', id),
 
   listCategories: (): Promise<Category[]> => ipcRenderer.invoke('categories:list'),
   addCategory: (name: string): Promise<Category[]> => ipcRenderer.invoke('categories:add', name),
@@ -22,7 +25,9 @@ const api = {
 
   scan: (): Promise<Candidate[]> => ipcRenderer.invoke('scanner:scan'),
   importCandidates: (candidates: Candidate[]): Promise<Entry[]> =>
-    ipcRenderer.invoke('scanner:import', candidates)
+    ipcRenderer.invoke('scanner:import', candidates),
+
+  listStats: (): Promise<EntryStats[]> => ipcRenderer.invoke('stats:list')
 }
 
 if (process.contextIsolated) {

@@ -4,6 +4,7 @@ import { randomUUID } from 'crypto'
 import { basename, dirname, extname } from 'path'
 import { getStore, setEntries, type Entry } from './store'
 import { ensureIconCached, removeCachedIcon } from './icons'
+import { startSession } from './playtime'
 
 function deriveName(targetPath: string): string {
   return basename(targetPath, extname(targetPath))
@@ -39,7 +40,10 @@ async function addEntryViaDialog(window: BrowserWindow): Promise<Entry[]> {
       iconHash,
       category: '',
       addedAt: Date.now(),
-      steamAppId: null
+      steamAppId: null,
+      epicAppName: null,
+      favorite: false,
+      expectedProcessName: basename(filePath)
     })
   }
 
@@ -84,6 +88,18 @@ function setEntryCategory(id: string, categoryId: string): Entry[] {
   return updated
 }
 
+function toggleFavorite(id: string): Entry[] {
+  const entries = getStore().get('entries')
+  const index = entries.findIndex((entry) => entry.id === id)
+  if (index === -1) {
+    throw new Error('Eintrag wurde nicht gefunden.')
+  }
+  const updated = [...entries]
+  updated[index] = { ...updated[index], favorite: !updated[index].favorite }
+  setEntries(updated)
+  return updated
+}
+
 async function removeEntry(id: string): Promise<Entry[]> {
   const entries = getStore().get('entries')
   const target = entries.find((entry) => entry.id === id)
@@ -110,13 +126,19 @@ async function launchEntry(id: string): Promise<void> {
   if (!entry) {
     throw new Error('Eintrag wurde nicht gefunden.')
   }
-  // Steam-Spiele laufen über den Steam-Client, nicht per direktem Programmstart —
-  // sonst fehlen Overlay, Cloud-Saves und Achievements.
+  // Steam- und Epic-Spiele laufen über den jeweiligen Client, nicht per direktem
+  // Programmstart — sonst fehlen Overlay, Cloud-Saves und Achievements.
   if (entry.steamAppId) {
     await shell.openExternal(`steam://rungameid/${entry.steamAppId}`)
-    return
+  } else if (entry.epicAppName) {
+    await shell.openExternal(
+      `com.epicgames.launcher://apps/${entry.epicAppName}?action=launch&silent=true`
+    )
+  } else {
+    spawn(entry.path, [], { detached: true, stdio: 'ignore', cwd: dirname(entry.path) }).unref()
   }
-  spawn(entry.path, [], { detached: true, stdio: 'ignore', cwd: dirname(entry.path) }).unref()
+
+  startSession(entry.id, entry.expectedProcessName)
 }
 
 export function registerEntryHandlers(getWindow: () => BrowserWindow | null): void {
@@ -135,6 +157,8 @@ export function registerEntryHandlers(getWindow: () => BrowserWindow | null): vo
   ipcMain.handle('entries:setCategory', (_event, id: string, categoryId: string) =>
     setEntryCategory(id, categoryId)
   )
+
+  ipcMain.handle('entries:toggleFavorite', (_event, id: string) => toggleFavorite(id))
 
   ipcMain.handle('entries:remove', (_event, id: string) => removeEntry(id))
 

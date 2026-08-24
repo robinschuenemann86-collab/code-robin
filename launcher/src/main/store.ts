@@ -2,7 +2,7 @@ import Store from 'electron-store'
 import { z } from 'zod'
 import { app, dialog } from 'electron'
 import { copyFileSync, existsSync } from 'fs'
-import { join } from 'path'
+import { basename, join } from 'path'
 
 const EntrySchema = z.object({
   id: z.string(),
@@ -13,7 +13,13 @@ const EntrySchema = z.object({
   addedAt: z.number(),
   // Nur gesetzt für per Scanner importierte Steam-Spiele. Diese werden über
   // steam://rungameid/<id> gestartet, nicht direkt über einen Programmpfad.
-  steamAppId: z.string().nullable().default(null)
+  steamAppId: z.string().nullable().default(null),
+  // Analog für Epic-Games-Titel: com.epicgames.launcher://apps/<id>?action=launch
+  epicAppName: z.string().nullable().default(null),
+  favorite: z.boolean().default(false),
+  // Prozessname (z. B. "Game.exe"), auf den beim Spielzeit-Tracking gepollt wird.
+  // Ohne diesen Wert kann keine Spielzeit erfasst werden (siehe playtime.ts).
+  expectedProcessName: z.string().nullable().default(null)
 })
 
 const CategorySchema = z.object({
@@ -21,16 +27,24 @@ const CategorySchema = z.object({
   name: z.string().min(1)
 })
 
+const SessionSchema = z.object({
+  id: z.string(),
+  entryId: z.string(),
+  startedAt: z.number(),
+  endedAt: z.number().nullable()
+})
+
 const StoreDataSchema = z.object({
   version: z.literal(1),
   entries: z.array(EntrySchema),
   categories: z.array(CategorySchema),
-  sessions: z.array(z.unknown()),
+  sessions: z.array(SessionSchema),
   settings: z.record(z.string(), z.unknown())
 })
 
 export type Entry = z.infer<typeof EntrySchema>
 export type Category = z.infer<typeof CategorySchema>
+export type Session = z.infer<typeof SessionSchema>
 export type StoreData = z.infer<typeof StoreDataSchema>
 
 const defaults: StoreData = {
@@ -69,7 +83,28 @@ export function initStore(): Store<StoreData> {
     )
   }
 
+  backfillExpectedProcessNames()
+
   return store
+}
+
+// Einträge aus Ständen vor der Spielzeit-Erfassung kennen expectedProcessName
+// noch nicht. Für direkt gestartete Programme (kein Steam/Epic) lässt sich das
+// gefahrlos aus dem gespeicherten Pfad nachtragen.
+function backfillExpectedProcessNames(): void {
+  const entries = store.get('entries')
+  const needsBackfill = entries.some(
+    (e) => !e.expectedProcessName && !e.steamAppId && !e.epicAppName
+  )
+  if (!needsBackfill) return
+
+  setEntries(
+    entries.map((e) =>
+      !e.expectedProcessName && !e.steamAppId && !e.epicAppName
+        ? { ...e, expectedProcessName: basename(e.path) }
+        : e
+    )
+  )
 }
 
 export function getStore(): Store<StoreData> {
@@ -95,4 +130,13 @@ export function setCategories(categories: Category[]): void {
     throw new Error(`Ungültige Kategoriedaten: ${parsed.error.message}`)
   }
   store.set('categories', categories)
+}
+
+export function setSessions(sessions: Session[]): void {
+  const draft = { ...store.store, sessions }
+  const parsed = StoreDataSchema.safeParse(draft)
+  if (!parsed.success) {
+    throw new Error(`Ungültige Sitzungsdaten: ${parsed.error.message}`)
+  }
+  store.set('sessions', sessions)
 }

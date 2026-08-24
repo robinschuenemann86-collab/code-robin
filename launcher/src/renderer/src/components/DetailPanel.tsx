@@ -1,23 +1,46 @@
 import { useState, type ReactElement } from 'react'
-import type { Category, Entry } from '../types'
+import type { Category, Entry, EntryStats } from '../types'
 import { EntryIcon } from './EntryIcon'
+import {
+  IconCalendar,
+  IconClock,
+  IconEdit,
+  IconFolder,
+  IconPlay,
+  IconStar,
+  IconTag,
+  IconTrash,
+  IconX
+} from './icons'
 
 interface DetailPanelProps {
   entry: Entry
   categories: Category[]
+  stats: EntryStats | null
   onLaunch: (entry: Entry) => void
   onRename: (id: string, name: string) => void
   onSetCategory: (id: string, categoryId: string) => void
+  onToggleFavorite: (entry: Entry) => void
   onRemove: (entry: Entry) => void
   onClose: () => void
+}
+
+function formatDuration(ms: number): string {
+  const minutes = Math.round(ms / 60_000)
+  if (minutes < 60) return `${minutes} min`
+  const hours = Math.floor(minutes / 60)
+  const rest = minutes % 60
+  return rest === 0 ? `${hours} h` : `${hours} h ${rest} min`
 }
 
 export function DetailPanel({
   entry,
   categories,
+  stats,
   onLaunch,
   onRename,
   onSetCategory,
+  onToggleFavorite,
   onRemove,
   onClose
 }: DetailPanelProps): ReactElement {
@@ -31,15 +54,17 @@ export function DetailPanel({
   }
 
   return (
-    <aside className="flex w-72 shrink-0 flex-col gap-4 border-l border-neutral-800 p-4">
-      <div className="flex items-start justify-between">
-        <span className="text-xs uppercase tracking-wide text-neutral-500">Details</span>
+    <aside className="flex w-72 shrink-0 flex-col gap-4 border-l border-border bg-panel/40 p-5">
+      <div className="flex items-center justify-between">
         <button
-          onClick={onClose}
-          className="text-neutral-500 hover:text-neutral-300"
-          title="Schließen"
+          onClick={() => onToggleFavorite(entry)}
+          title="Favorit"
+          className={entry.favorite ? 'text-amber' : 'text-text-muted hover:text-amber'}
         >
-          ✕
+          <IconStar className="h-4 w-4" filled={entry.favorite} />
+        </button>
+        <button onClick={onClose} className="text-text-muted hover:text-cyan" title="Schließen">
+          <IconX className="h-4 w-4" />
         </button>
       </div>
 
@@ -58,21 +83,24 @@ export function DetailPanel({
                 setEditingName(false)
               }
             }}
-            className="w-full rounded bg-neutral-800 px-2 py-1 text-center text-sm outline-none"
+            className="w-full rounded-lg bg-panel-hover px-2 py-1 text-center text-sm text-text outline-none"
           />
         ) : (
-          <button onClick={() => setEditingName(true)} className="text-center text-sm font-medium">
-            {entry.name} <span className="text-xs text-neutral-500">✏️</span>
+          <button
+            onClick={() => setEditingName(true)}
+            className="flex items-center gap-1.5 text-center text-sm font-medium"
+          >
+            {entry.name} <IconEdit className="h-3 w-3 text-text-muted" />
           </button>
         )}
       </div>
 
-      <label className="flex flex-col gap-1 text-xs text-neutral-500">
-        Kategorie
+      <div className="flex items-center gap-2">
+        <IconTag className="h-4 w-4 shrink-0 text-text-muted" />
         <select
           value={entry.category}
           onChange={(e) => onSetCategory(entry.id, e.target.value)}
-          className="rounded-md border border-neutral-800 bg-neutral-900 px-2 py-1 text-sm text-neutral-100 outline-none"
+          className="w-full rounded-lg border border-border bg-panel px-2 py-1 text-sm text-text outline-none focus:border-cyan/50"
         >
           <option value="">Unsortiert</option>
           {categories.map((c) => (
@@ -81,34 +109,46 @@ export function DetailPanel({
             </option>
           ))}
         </select>
-      </label>
+      </div>
 
-      <div className="flex flex-col gap-1 text-xs text-neutral-500">
-        Pfad
+      <div className="flex items-start gap-2">
+        <IconFolder className="mt-0.5 h-4 w-4 shrink-0 text-text-muted" />
         <span
-          className="break-all rounded-md bg-neutral-900 p-2 font-mono text-neutral-300"
+          className="break-all rounded-lg border border-border bg-panel p-2 font-mono text-xs text-text"
           title={entry.path}
         >
           {entry.path}
         </span>
       </div>
 
-      <div className="text-xs text-neutral-500">
-        Hinzugefügt am {new Date(entry.addedAt).toLocaleDateString('de-DE')}
+      <div className="flex items-center gap-2 text-xs text-text-muted">
+        <IconCalendar className="h-4 w-4 shrink-0" />
+        {new Date(entry.addedAt).toLocaleDateString('de-DE')}
       </div>
 
-      <div className="mt-auto flex flex-col gap-2">
+      {stats && stats.totalPlayedMs > 0 && (
+        <div className="flex items-center gap-2 text-xs text-text-muted">
+          <IconClock className="h-4 w-4 shrink-0" />
+          {formatDuration(stats.totalPlayedMs)}
+          {stats.lastPlayedAt &&
+            ` · zuletzt ${new Date(stats.lastPlayedAt).toLocaleDateString('de-DE')}`}
+        </div>
+      )}
+
+      <div className="mt-auto flex gap-2">
         <button
           onClick={() => onLaunch(entry)}
-          className="rounded-md bg-neutral-100 px-4 py-2 text-sm font-medium text-neutral-900 hover:bg-white"
+          title="Starten"
+          className="glow-cyan flex flex-1 items-center justify-center rounded-lg bg-cyan py-2.5 text-base transition hover:brightness-110"
         >
-          Starten
+          <IconPlay className="h-5 w-5" />
         </button>
         <button
           onClick={() => onRemove(entry)}
-          className="rounded-md border border-neutral-800 px-4 py-2 text-sm text-neutral-300 hover:bg-neutral-900"
+          title="Entfernen"
+          className="flex items-center justify-center rounded-lg border border-border px-4 text-text-muted transition hover:border-pink/50 hover:text-pink"
         >
-          Entfernen
+          <IconTrash className="h-4 w-4" />
         </button>
       </div>
     </aside>

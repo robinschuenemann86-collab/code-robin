@@ -12,7 +12,7 @@ export function EntryIcon({
   if (!iconHash || failed) {
     return (
       <div
-        className={`flex shrink-0 items-center justify-center rounded-md bg-neutral-800 text-xl ${className}`}
+        className={`flex shrink-0 items-center justify-center rounded-xl border border-border bg-panel text-xl ${className}`}
       >
         🎮
       </div>
@@ -23,7 +23,7 @@ export function EntryIcon({
     <img
       src={`launcher-icon://${iconHash}`}
       alt=""
-      className={`shrink-0 rounded-md bg-neutral-800 object-contain ${className}`}
+      className={`shrink-0 rounded-xl border border-border bg-panel object-contain ${className}`}
       onError={() => setFailed(true)}
     />
   )
