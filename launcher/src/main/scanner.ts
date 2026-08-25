@@ -385,7 +385,7 @@ async function importCandidates(candidates: Candidate[]): Promise<Entry[]> {
       name: candidate.name,
       path: candidate.path,
       iconHash: candidate.iconHash,
-      category: '',
+      tags: [],
       addedAt: Date.now(),
       steamAppId: candidate.steamAppId,
       epicAppName: candidate.epicAppName,

@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { Entry, Category } from '../main/store'
+import type { Entry, Tag } from '../main/store'
 import type { Candidate } from '../main/scanner'
 import type { EntryStats } from '../main/stats'
 import type { UpdaterStatus } from '../main/updater'
@@ -11,18 +11,19 @@ const api = {
   addEntryViaDialog: (): Promise<Entry[]> => ipcRenderer.invoke('entries:addViaDialog'),
   renameEntry: (id: string, name: string): Promise<Entry[]> =>
     ipcRenderer.invoke('entries:rename', id, name),
-  setEntryCategory: (id: string, categoryId: string): Promise<Entry[]> =>
-    ipcRenderer.invoke('entries:setCategory', id, categoryId),
+  toggleEntryTag: (id: string, tagId: string): Promise<Entry[]> =>
+    ipcRenderer.invoke('entries:toggleTag', id, tagId),
   removeEntry: (id: string): Promise<Entry[]> => ipcRenderer.invoke('entries:remove', id),
   launchEntry: (id: string): Promise<void> => ipcRenderer.invoke('entries:launch', id),
+  getEntrySize: (id: string): Promise<number | null> => ipcRenderer.invoke('entries:getSize', id),
   toggleFavorite: (id: string): Promise<Entry[]> =>
     ipcRenderer.invoke('entries:toggleFavorite', id),
 
-  listCategories: (): Promise<Category[]> => ipcRenderer.invoke('categories:list'),
-  addCategory: (name: string): Promise<Category[]> => ipcRenderer.invoke('categories:add', name),
-  renameCategory: (id: string, name: string): Promise<Category[]> =>
-    ipcRenderer.invoke('categories:rename', id, name),
-  removeCategory: (id: string): Promise<Category[]> => ipcRenderer.invoke('categories:remove', id),
+  listTags: (): Promise<Tag[]> => ipcRenderer.invoke('tags:list'),
+  addTag: (name: string): Promise<Tag[]> => ipcRenderer.invoke('tags:add', name),
+  renameTag: (id: string, name: string): Promise<Tag[]> =>
+    ipcRenderer.invoke('tags:rename', id, name),
+  removeTag: (id: string): Promise<Tag[]> => ipcRenderer.invoke('tags:remove', id),
 
   scan: (): Promise<Candidate[]> => ipcRenderer.invoke('scanner:scan'),
   importCandidates: (candidates: Candidate[]): Promise<Entry[]> =>
@@ -35,7 +36,15 @@ const api = {
     ipcRenderer.on('updater:status', listener)
     return () => ipcRenderer.removeListener('updater:status', listener)
   },
-  installUpdate: (): Promise<void> => ipcRenderer.invoke('updater:install')
+  installUpdate: (): Promise<void> => ipcRenderer.invoke('updater:install'),
+
+  setFullscreen: (value: boolean): Promise<void> =>
+    ipcRenderer.invoke('window:setFullscreen', value),
+  onFullscreenChanged: (callback: (value: boolean) => void): (() => void) => {
+    const listener = (_event: unknown, value: boolean): void => callback(value)
+    ipcRenderer.on('window:fullscreenChanged', listener)
+    return () => ipcRenderer.removeListener('window:fullscreenChanged', listener)
+  }
 }
 
 if (process.contextIsolated) {

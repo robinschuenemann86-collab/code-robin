@@ -1,9 +1,10 @@
-import { useState, type ReactElement } from 'react'
-import type { Category, Entry, EntryStats } from '../types'
+import { useEffect, useState, type ReactElement } from 'react'
+import type { Entry, EntryStats, Tag } from '../types'
 import { EntryIcon } from './EntryIcon'
 import {
   IconCalendar,
   IconClock,
+  IconDisc,
   IconEdit,
   IconFolder,
   IconPlay,
@@ -13,13 +14,19 @@ import {
   IconX
 } from './icons'
 
+function formatSize(bytes: number): string {
+  if (bytes < 1024 ** 2) return `${(bytes / 1024).toFixed(0)} KB`
+  if (bytes < 1024 ** 3) return `${(bytes / 1024 ** 2).toFixed(0)} MB`
+  return `${(bytes / 1024 ** 3).toFixed(1)} GB`
+}
+
 interface DetailPanelProps {
   entry: Entry
-  categories: Category[]
+  tags: Tag[]
   stats: EntryStats | null
   onLaunch: (entry: Entry) => void
   onRename: (id: string, name: string) => void
-  onSetCategory: (id: string, categoryId: string) => void
+  onToggleTag: (id: string, tagId: string) => void
   onToggleFavorite: (entry: Entry) => void
   onRemove: (entry: Entry) => void
   onClose: () => void
@@ -35,17 +42,23 @@ function formatDuration(ms: number): string {
 
 export function DetailPanel({
   entry,
-  categories,
+  tags,
   stats,
   onLaunch,
   onRename,
-  onSetCategory,
+  onToggleTag,
   onToggleFavorite,
   onRemove,
   onClose
 }: DetailPanelProps): ReactElement {
   const [editingName, setEditingName] = useState(false)
   const [name, setName] = useState(entry.name)
+  const [size, setSize] = useState<number | null | 'loading'>('loading')
+
+  useEffect(() => {
+    setSize('loading')
+    window.api.getEntrySize(entry.id).then(setSize)
+  }, [entry.id])
 
   function commitName(): void {
     const trimmed = name.trim()
@@ -95,20 +108,30 @@ export function DetailPanel({
         )}
       </div>
 
-      <div className="flex items-center gap-2">
-        <IconTag className="h-4 w-4 shrink-0 text-text-muted" />
-        <select
-          value={entry.category}
-          onChange={(e) => onSetCategory(entry.id, e.target.value)}
-          className="w-full rounded-lg border border-border bg-panel px-2 py-1 text-sm text-text outline-none focus:border-cyan/50"
-        >
-          <option value="">Unsortiert</option>
-          {categories.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name}
-            </option>
-          ))}
-        </select>
+      <div className="flex items-start gap-2">
+        <IconTag className="mt-1 h-4 w-4 shrink-0 text-text-muted" />
+        {tags.length === 0 ? (
+          <p className="pt-1 text-xs text-text-muted">Noch keine Tags angelegt.</p>
+        ) : (
+          <div className="flex flex-1 flex-wrap gap-1.5">
+            {tags.map((tag) => {
+              const active = entry.tags.includes(tag.id)
+              return (
+                <button
+                  key={tag.id}
+                  onClick={() => onToggleTag(entry.id, tag.id)}
+                  className={`rounded-full border px-2 py-0.5 text-xs transition ${
+                    active
+                      ? 'border-cyan/60 bg-panel-active text-cyan'
+                      : 'border-border text-text-muted hover:border-cyan/30 hover:text-text'
+                  }`}
+                >
+                  {tag.name}
+                </button>
+              )
+            })}
+          </div>
+        )}
       </div>
 
       <div className="flex items-start gap-2">
@@ -124,6 +147,11 @@ export function DetailPanel({
       <div className="flex items-center gap-2 text-xs text-text-muted">
         <IconCalendar className="h-4 w-4 shrink-0" />
         {new Date(entry.addedAt).toLocaleDateString('de-DE')}
+      </div>
+
+      <div className="flex items-center gap-2 text-xs text-text-muted">
+        <IconDisc className="h-4 w-4 shrink-0" />
+        {size === 'loading' ? 'Größe wird berechnet …' : size === null ? 'Größe unbekannt' : formatSize(size)}
       </div>
 
       {stats && stats.totalPlayedMs > 0 && (

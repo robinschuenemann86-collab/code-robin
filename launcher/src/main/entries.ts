@@ -1,7 +1,8 @@
 import { ipcMain, dialog, shell, BrowserWindow } from 'electron'
 import { spawn } from 'child_process'
 import { randomUUID } from 'crypto'
-import { basename, dirname, extname } from 'path'
+import { basename, dirname, extname, join } from 'path'
+import { readdir, stat } from 'fs/promises'
 import { getStore, setEntries, type Entry } from './store'
 import { ensureIconCached, removeCachedIcon } from './icons'
 import { startSession } from './playtime'
@@ -38,7 +39,7 @@ async function addEntryViaDialog(window: BrowserWindow): Promise<Entry[]> {
       name: deriveName(filePath),
       path: filePath,
       iconHash,
-      category: '',
+      tags: [],
       addedAt: Date.now(),
       steamAppId: null,
       epicAppName: null,
@@ -68,22 +69,23 @@ function renameEntry(id: string, name: string): Entry[] {
   return updated
 }
 
-function setEntryCategory(id: string, categoryId: string): Entry[] {
+function toggleEntryTag(id: string, tagId: string): Entry[] {
   const entries = getStore().get('entries')
   const index = entries.findIndex((entry) => entry.id === id)
   if (index === -1) {
     throw new Error('Eintrag wurde nicht gefunden.')
   }
   if (
-    categoryId !== '' &&
     !getStore()
-      .get('categories')
-      .some((c) => c.id === categoryId)
+      .get('tags')
+      .some((t) => t.id === tagId)
   ) {
-    throw new Error('Kategorie wurde nicht gefunden.')
+    throw new Error('Tag wurde nicht gefunden.')
   }
+  const current = entries[index].tags
+  const tags = current.includes(tagId) ? current.filter((t) => t !== tagId) : [...current, tagId]
   const updated = [...entries]
-  updated[index] = { ...updated[index], category: categoryId }
+  updated[index] = { ...updated[index], tags }
   setEntries(updated)
   return updated
 }
@@ -141,6 +143,47 @@ async function launchEntry(id: string): Promise<void> {
   startSession(entry.id, entry.expectedProcessName)
 }
 
+// Läuft rekursiv einen Ordner ab und summiert die Dateigrößen. Einzelne
+// Dateien/Unterordner ohne Zugriff werden übersprungen statt die ganze
+// Berechnung abzubrechen — bei Spielordnern sind vereinzelte Sperren normal.
+async function directorySize(dir: string): Promise<number> {
+  let total = 0
+  let items: import('fs').Dirent[]
+  try {
+    items = await readdir(dir, { withFileTypes: true })
+  } catch {
+    return 0
+  }
+  for (const item of items) {
+    const itemPath = join(dir, item.name)
+    if (item.isDirectory()) {
+      total += await directorySize(itemPath)
+    } else if (item.isFile()) {
+      try {
+        total += (await stat(itemPath)).size
+      } catch {
+        // Datei zwischen readdir und stat verschwunden oder gesperrt — ignorieren.
+      }
+    }
+  }
+  return total
+}
+
+async function getEntrySize(id: string): Promise<number | null> {
+  const entries = getStore().get('entries')
+  const entry = entries.find((e) => e.id === id)
+  if (!entry) {
+    throw new Error('Eintrag wurde nicht gefunden.')
+  }
+  try {
+    const info = await stat(entry.path)
+    const folder = info.isDirectory() ? entry.path : dirname(entry.path)
+    return await directorySize(folder)
+  } catch {
+    return null
+  }
+}
+
 export function registerEntryHandlers(getWindow: () => BrowserWindow | null): void {
   ipcMain.handle('entries:list', () => getStore().get('entries'))
 
@@ -154,8 +197,8 @@ export function registerEntryHandlers(getWindow: () => BrowserWindow | null): vo
 
   ipcMain.handle('entries:rename', (_event, id: string, name: string) => renameEntry(id, name))
 
-  ipcMain.handle('entries:setCategory', (_event, id: string, categoryId: string) =>
-    setEntryCategory(id, categoryId)
+  ipcMain.handle('entries:toggleTag', (_event, id: string, tagId: string) =>
+    toggleEntryTag(id, tagId)
   )
 
   ipcMain.handle('entries:toggleFavorite', (_event, id: string) => toggleFavorite(id))
@@ -163,4 +206,6 @@ export function registerEntryHandlers(getWindow: () => BrowserWindow | null): vo
   ipcMain.handle('entries:remove', (_event, id: string) => removeEntry(id))
 
   ipcMain.handle('entries:launch', (_event, id: string) => launchEntry(id))
+
+  ipcMain.handle('entries:getSize', (_event, id: string) => getEntrySize(id))
 }

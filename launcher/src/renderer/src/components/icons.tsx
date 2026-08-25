@@ -118,6 +118,17 @@ export function IconFolder(props: IconProps): ReactElement {
   )
 }
 
+export function IconDisc(props: IconProps): ReactElement {
+  return base(
+    props,
+    <>
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <path d="M3 14h18" />
+      <circle cx="8" cy="17" r="1" fill="currentColor" stroke="none" />
+    </>
+  )
+}
+
 export function IconCalendar(props: IconProps): ReactElement {
   return base(
     props,
@@ -152,6 +163,15 @@ export function IconAlertTriangle(props: IconProps): ReactElement {
     <>
       <path d="M12 3.5 22 20H2Z" />
       <path d="M12 9.5v5M12 17.5h.01" />
+    </>
+  )
+}
+
+export function IconExpand(props: IconProps): ReactElement {
+  return base(
+    props,
+    <>
+      <path d="M9 4H4v5M15 4h5v5M9 20H4v-5M15 20h5v-5" />
     </>
   )
 }

@@ -4,16 +4,19 @@ import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { initStore } from './store'
 import { registerEntryHandlers } from './entries'
-import { registerCategoryHandlers } from './categories'
+import { registerTagHandlers } from './tags'
 import { registerScannerHandlers } from './scanner'
 import { registerStatsHandlers } from './stats'
 import { closeDanglingSessions } from './playtime'
 import { registerIconProtocolScheme, registerIconProtocolHandler } from './iconProtocol'
 import { registerUpdaterHandlers } from './updater'
+import { registerTray, unregisterHotkey } from './tray'
+import { registerFullscreenHandlers, forwardFullscreenEvents } from './fullscreen'
 
 registerIconProtocolScheme()
 
 let mainWindow: BrowserWindow | null = null
+let isQuitting = false
 
 function createWindow(): void {
   mainWindow = new BrowserWindow({
@@ -37,6 +40,17 @@ function createWindow(): void {
   mainWindow.on('closed', () => {
     mainWindow = null
   })
+
+  // Fenster-X minimiert in den Tray statt die App zu beenden — wirklich
+  // beendet wird nur über "Beenden" im Tray-Menü (setzt isQuitting).
+  mainWindow.on('close', (event) => {
+    if (!isQuitting) {
+      event.preventDefault()
+      mainWindow?.hide()
+    }
+  })
+
+  forwardFullscreenEvents(mainWindow)
 
   mainWindow.webContents.setWindowOpenHandler((details) => {
     shell.openExternal(details.url)
@@ -70,10 +84,12 @@ app.whenReady().then(() => {
   initStore()
   closeDanglingSessions()
   registerEntryHandlers(() => mainWindow)
-  registerCategoryHandlers()
+  registerTagHandlers()
   registerScannerHandlers()
   registerStatsHandlers()
   registerUpdaterHandlers(() => mainWindow)
+  registerTray(() => mainWindow)
+  registerFullscreenHandlers(() => mainWindow)
 
   createWindow()
 
@@ -82,6 +98,11 @@ app.whenReady().then(() => {
     // dock icon is clicked and there are no other windows open.
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
+})
+
+app.on('before-quit', () => {
+  isQuitting = true
+  unregisterHotkey()
 })
 
 // Quit when all windows are closed, except on macOS. There, it's common

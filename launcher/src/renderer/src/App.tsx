@@ -1,45 +1,56 @@
 import { useEffect, useMemo, useState, type ReactElement } from 'react'
-import type { Category, Entry, EntryStats, ViewMode } from './types'
+import type { Entry, EntryStats, Tag, ViewMode } from './types'
 import type { UpdaterStatus } from '../../main/updater'
 import { EntryIcon } from './components/EntryIcon'
 import { Sidebar } from './components/Sidebar'
 import { DetailPanel } from './components/DetailPanel'
 import { ScannerDialog } from './components/ScannerDialog'
 import { StatsDialog } from './components/StatsDialog'
-import { IconClock, IconPlus, IconSearch, IconStar, IconTrash } from './components/icons'
+import { BigPictureView } from './components/BigPictureView'
+import {
+  IconClock,
+  IconExpand,
+  IconPlus,
+  IconSearch,
+  IconStar,
+  IconTrash
+} from './components/icons'
 import logo from './assets/logo.png'
 
 function App(): ReactElement {
   const [entries, setEntries] = useState<Entry[]>([])
-  const [categories, setCategories] = useState<Category[]>([])
+  const [tags, setTags] = useState<Tag[]>([])
   const [stats, setStats] = useState<EntryStats[]>([])
   const [loading, setLoading] = useState(true)
   const [status, setStatus] = useState('')
   const [scannerOpen, setScannerOpen] = useState(false)
   const [statsOpen, setStatsOpen] = useState(false)
   const [updaterStatus, setUpdaterStatus] = useState<UpdaterStatus | null>(null)
+  const [bigPictureMode, setBigPictureMode] = useState(false)
 
   const [searchQuery, setSearchQuery] = useState('')
-  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null)
+  const [selectedTagId, setSelectedTagId] = useState<string | null>(null)
   const [favoritesOnly, setFavoritesOnly] = useState(false)
   const [viewMode, setViewMode] = useState<ViewMode>('grid')
   const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null)
 
   useEffect(() => {
-    Promise.all([
-      window.api.listEntries(),
-      window.api.listCategories(),
-      window.api.listStats()
-    ]).then(([loadedEntries, loadedCategories, loadedStats]) => {
-      setEntries(loadedEntries)
-      setCategories(loadedCategories)
-      setStats(loadedStats)
-      setLoading(false)
-    })
+    Promise.all([window.api.listEntries(), window.api.listTags(), window.api.listStats()]).then(
+      ([loadedEntries, loadedTags, loadedStats]) => {
+        setEntries(loadedEntries)
+        setTags(loadedTags)
+        setStats(loadedStats)
+        setLoading(false)
+      }
+    )
   }, [])
 
   useEffect(() => {
     return window.api.onUpdaterStatus(setUpdaterStatus)
+  }, [])
+
+  useEffect(() => {
+    return window.api.onFullscreenChanged(setBigPictureMode)
   }, [])
 
   // Spielzeit läuft im Hintergrund weiter (Prozess-Polling im Main-Prozess),
@@ -54,13 +65,27 @@ function App(): ReactElement {
     const query = searchQuery.trim().toLowerCase()
     return entries.filter((entry) => {
       if (favoritesOnly && !entry.favorite) return false
-      if (selectedCategoryId !== null && entry.category !== selectedCategoryId) return false
+      if (selectedTagId === '' && entry.tags.length > 0) return false
+      if (selectedTagId && selectedTagId !== '' && !entry.tags.includes(selectedTagId))
+        return false
       if (query && !entry.name.toLowerCase().includes(query)) return false
       return true
     })
-  }, [entries, searchQuery, selectedCategoryId, favoritesOnly])
+  }, [entries, searchQuery, selectedTagId, favoritesOnly])
 
   const selectedEntry = entries.find((e) => e.id === selectedEntryId) ?? null
+
+  // Nur im ungefilterten Grundzustand zeigen — sonst wirkt es wie eine zweite,
+  // widersprüchliche Liste neben den gerade gefilterten Ergebnissen.
+  const recentlyPlayed = useMemo(() => {
+    if (searchQuery.trim() || selectedTagId !== null || favoritesOnly) return []
+    return stats
+      .filter((s) => s.lastPlayedAt !== null)
+      .sort((a, b) => (b.lastPlayedAt ?? 0) - (a.lastPlayedAt ?? 0))
+      .slice(0, 6)
+      .map((s) => entries.find((e) => e.id === s.entryId))
+      .filter((e): e is Entry => e !== undefined)
+  }, [stats, entries, searchQuery, selectedTagId, favoritesOnly])
 
   async function handleAdd(): Promise<void> {
     const updated = await window.api.addEntryViaDialog()
@@ -96,38 +121,39 @@ function App(): ReactElement {
     await window.api.installUpdate()
   }
 
-  async function handleSetCategory(id: string, categoryId: string): Promise<void> {
-    setEntries(await window.api.setEntryCategory(id, categoryId))
+  async function handleToggleTag(id: string, tagId: string): Promise<void> {
+    setEntries(await window.api.toggleEntryTag(id, tagId))
   }
 
-  async function handleAddCategory(name: string): Promise<void> {
+  async function handleAddTag(name: string): Promise<void> {
     try {
-      setCategories(await window.api.addCategory(name))
+      setTags(await window.api.addTag(name))
     } catch (error) {
       setStatus(error instanceof Error ? error.message : String(error))
     }
   }
 
-  async function handleRenameCategory(id: string, name: string): Promise<void> {
+  async function handleRenameTag(id: string, name: string): Promise<void> {
     try {
-      setCategories(await window.api.renameCategory(id, name))
+      setTags(await window.api.renameTag(id, name))
     } catch (error) {
       setStatus(error instanceof Error ? error.message : String(error))
     }
   }
 
-  async function handleRemoveCategory(id: string): Promise<void> {
-    const category = categories.find((c) => c.id === id)
-    if (category && !window.confirm(`Kategorie "${category.name}" löschen?`)) return
-    setCategories(await window.api.removeCategory(id))
+  async function handleRemoveTag(id: string): Promise<void> {
+    const tag = tags.find((t) => t.id === id)
+    if (tag && !window.confirm(`Tag "${tag.name}" löschen?`)) return
+    setTags(await window.api.removeTag(id))
     setEntries(await window.api.listEntries())
-    if (selectedCategoryId === id) setSelectedCategoryId(null)
+    if (selectedTagId === id) setSelectedTagId(null)
   }
 
   // Pfeiltasten wandern durch die aktuell gefilterte Liste, Enter startet,
   // Entf/Rücktaste löscht — nur solange kein Eingabefeld fokussiert ist.
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent): void {
+      if (bigPictureMode) return
       const activeTag = document.activeElement?.tagName
       if (activeTag === 'INPUT' || activeTag === 'TEXTAREA' || activeTag === 'SELECT') return
       if (filteredEntries.length === 0) return
@@ -161,11 +187,21 @@ function App(): ReactElement {
     // handleLaunch/handleDelete read `entries` via the `selectedEntry` closure captured above,
     // so listing them here would only force pointless re-subscriptions on every render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filteredEntries, selectedEntryId, selectedEntry])
+  }, [filteredEntries, selectedEntryId, selectedEntry, bigPictureMode])
 
   function resetFilters(): void {
     setSearchQuery('')
-    setSelectedCategoryId(null)
+    setSelectedTagId(null)
+  }
+
+  if (bigPictureMode) {
+    return (
+      <BigPictureView
+        entries={filteredEntries}
+        onLaunch={handleLaunch}
+        onExit={() => window.api.setFullscreen(false)}
+      />
+    )
   }
 
   return (
@@ -179,6 +215,13 @@ function App(): ReactElement {
           </div>
         </div>
         <div className="flex gap-2">
+          <button
+            onClick={() => window.api.setFullscreen(true)}
+            title="Big-Picture-Modus"
+            className="rounded-lg border border-border bg-panel p-2.5 text-text transition hover:border-cyan/50 hover:text-cyan"
+          >
+            <IconExpand />
+          </button>
           <button
             onClick={() => setStatsOpen(true)}
             title="Statistik"
@@ -204,16 +247,20 @@ function App(): ReactElement {
       </header>
 
       {updaterStatus?.state === 'downloading' && (
-        <div className="flex items-center justify-between bg-panel px-8 py-2 text-sm text-text-muted">
+        <div className="relative overflow-hidden border-b border-cyan/30 bg-panel-active px-8 py-2 text-sm text-text">
           <span>Update wird heruntergeladen … {updaterStatus.percent}%</span>
+          <div
+            className="absolute inset-x-0 bottom-0 h-0.5 bg-cyan transition-all"
+            style={{ width: `${updaterStatus.percent}%` }}
+          />
         </div>
       )}
       {updaterStatus?.state === 'downloaded' && (
-        <div className="flex items-center justify-between bg-panel px-8 py-2 text-sm text-text">
+        <div className="glow-cyan flex items-center justify-between border-b border-cyan/40 bg-panel-active px-8 py-2 text-sm text-text">
           <span>Update auf Version {updaterStatus.version} ist bereit.</span>
           <button
             onClick={handleInstallUpdate}
-            className="rounded-lg bg-pink px-3 py-1.5 text-sm text-white transition hover:brightness-110"
+            className="glow-pink rounded-lg bg-pink px-3 py-1.5 text-sm text-white transition hover:brightness-110"
           >
             Jetzt neu starten
           </button>
@@ -224,28 +271,57 @@ function App(): ReactElement {
 
       <div className="flex min-h-0 flex-1">
         <Sidebar
-          categories={categories}
+          tags={tags}
           entries={entries}
-          selectedCategoryId={selectedCategoryId}
-          onSelectCategory={setSelectedCategoryId}
+          selectedTagId={selectedTagId}
+          onSelectTag={setSelectedTagId}
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
           viewMode={viewMode}
           onViewModeChange={setViewMode}
           favoritesOnly={favoritesOnly}
           onFavoritesOnlyChange={setFavoritesOnly}
-          onAddCategory={handleAddCategory}
-          onRenameCategory={handleRenameCategory}
-          onRemoveCategory={handleRemoveCategory}
+          onAddTag={handleAddTag}
+          onRenameTag={handleRenameTag}
+          onRemoveTag={handleRemoveTag}
         />
 
         <main className="flex-1 overflow-y-auto p-8">
+          {recentlyPlayed.length > 0 && (
+            <div className="mb-6">
+              <h2 className="mb-3 text-sm font-medium text-text-muted">Zuletzt gespielt</h2>
+              <div className="flex gap-3 overflow-x-auto pb-1">
+                {recentlyPlayed.map((entry) => (
+                  <button
+                    key={entry.id}
+                    onClick={() => setSelectedEntryId(entry.id)}
+                    onDoubleClick={() => handleLaunch(entry)}
+                    className={`flex w-24 shrink-0 flex-col items-center gap-2 rounded-xl border p-3 text-center transition ${
+                      selectedEntryId === entry.id
+                        ? 'glow-cyan border-cyan/60 bg-panel-active'
+                        : 'border-border bg-panel hover:border-cyan/30 hover:bg-panel-hover'
+                    }`}
+                  >
+                    <EntryIcon iconHash={entry.iconHash} />
+                    <span className="w-full truncate text-xs font-medium">{entry.name}</span>
+                  </button>
+                ))}
+              </div>
+              <div className="divider mt-6" />
+            </div>
+          )}
           {loading ? (
             <p className="text-sm text-text-muted">Lade …</p>
           ) : entries.length === 0 ? (
             <div className="flex h-full flex-col items-center justify-center gap-3 text-text-muted">
               <IconPlus className="h-8 w-8" />
               <p className="text-sm">Noch keine Programme</p>
+              <button
+                onClick={handleAdd}
+                className="glow-pink rounded-lg bg-pink px-4 py-2 text-sm text-white transition hover:brightness-110"
+              >
+                Programm hinzufügen
+              </button>
             </div>
           ) : filteredEntries.length === 0 ? (
             <div className="flex h-full flex-col items-center justify-center gap-3 text-text-muted">
@@ -279,7 +355,7 @@ function App(): ReactElement {
                     className={`absolute left-2 top-2 p-1 ${
                       entry.favorite
                         ? 'block text-amber'
-                        : 'hidden text-text-muted hover:text-amber group-hover:block'
+                        : 'hidden text-text-muted hover:text-amber group-hover:block group-focus-within:block'
                     }`}
                   >
                     <IconStar className="h-3.5 w-3.5" filled={entry.favorite} />
@@ -290,7 +366,7 @@ function App(): ReactElement {
                       handleDelete(entry)
                     }}
                     title="Entfernen"
-                    className="absolute right-2 top-2 hidden rounded-md bg-panel-hover p-1 hover:bg-panel-active group-hover:block"
+                    className="absolute right-2 top-2 hidden rounded-md bg-panel-hover p-1 hover:bg-panel-active group-hover:block group-focus-within:block"
                   >
                     <IconTrash className="h-3.5 w-3.5" />
                   </button>
@@ -314,8 +390,13 @@ function App(): ReactElement {
                 >
                   <EntryIcon iconHash={entry.iconHash} className="h-8 w-8" />
                   <span className="flex-1 truncate text-sm font-medium">{entry.name}</span>
-                  <span className="text-xs text-text-muted">
-                    {categories.find((c) => c.id === entry.category)?.name ?? 'Unsortiert'}
+                  <span className="truncate text-xs text-text-muted">
+                    {entry.tags.length > 0
+                      ? entry.tags
+                          .map((id) => tags.find((t) => t.id === id)?.name)
+                          .filter(Boolean)
+                          .join(', ')
+                      : 'Unsortiert'}
                   </span>
                   <button
                     onClick={(e) => {
@@ -326,7 +407,7 @@ function App(): ReactElement {
                     className={`p-1 ${
                       entry.favorite
                         ? 'text-amber'
-                        : 'hidden text-text-muted hover:text-amber group-hover:inline-flex'
+                        : 'hidden text-text-muted hover:text-amber group-hover:inline-flex group-focus-within:inline-flex'
                     }`}
                   >
                     <IconStar className="h-3.5 w-3.5" filled={entry.favorite} />
@@ -337,7 +418,7 @@ function App(): ReactElement {
                       handleDelete(entry)
                     }}
                     title="Entfernen"
-                    className="hidden rounded-md bg-panel-hover p-1 hover:bg-panel-active group-hover:block"
+                    className="hidden rounded-md bg-panel-hover p-1 hover:bg-panel-active group-hover:block group-focus-within:block"
                   >
                     <IconTrash className="h-3.5 w-3.5" />
                   </button>
@@ -351,11 +432,11 @@ function App(): ReactElement {
           <DetailPanel
             key={selectedEntry.id}
             entry={selectedEntry}
-            categories={categories}
+            tags={tags}
             stats={stats.find((s) => s.entryId === selectedEntry.id) ?? null}
             onLaunch={handleLaunch}
             onRename={handleRename}
-            onSetCategory={handleSetCategory}
+            onToggleTag={handleToggleTag}
             onToggleFavorite={handleToggleFavorite}
             onRemove={handleDelete}
             onClose={() => setSelectedEntryId(null)}

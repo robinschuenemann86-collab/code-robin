@@ -1,61 +1,61 @@
 import { useState, type ReactElement } from 'react'
-import type { Category, Entry, ViewMode } from '../types'
+import type { Entry, Tag, ViewMode } from '../types'
 import { IconEdit, IconGrid, IconList, IconPlus, IconSearch, IconStar, IconTrash } from './icons'
 
 interface SidebarProps {
-  categories: Category[]
+  tags: Tag[]
   entries: Entry[]
-  selectedCategoryId: string | null
-  onSelectCategory: (id: string | null) => void
+  selectedTagId: string | null
+  onSelectTag: (id: string | null) => void
   searchQuery: string
   onSearchChange: (value: string) => void
   viewMode: ViewMode
   onViewModeChange: (mode: ViewMode) => void
   favoritesOnly: boolean
   onFavoritesOnlyChange: (value: boolean) => void
-  onAddCategory: (name: string) => void
-  onRenameCategory: (id: string, name: string) => void
-  onRemoveCategory: (id: string) => void
+  onAddTag: (name: string) => void
+  onRenameTag: (id: string, name: string) => void
+  onRemoveTag: (id: string) => void
 }
 
-// Kleine, sich wiederholende Akzentfarben für die Kategorie-Punkte —
+// Kleine, sich wiederholende Akzentfarben für die Tag-Punkte —
 // rein kosmetisch zur Wiedererkennung, keine feste Bedeutung pro Farbe.
 const DOT_COLORS = ['bg-cyan', 'bg-pink', 'bg-violet', 'bg-amber']
 
 export function Sidebar({
-  categories,
+  tags,
   entries,
-  selectedCategoryId,
-  onSelectCategory,
+  selectedTagId,
+  onSelectTag,
   searchQuery,
   onSearchChange,
   viewMode,
   onViewModeChange,
   favoritesOnly,
   onFavoritesOnlyChange,
-  onAddCategory,
-  onRenameCategory,
-  onRemoveCategory
+  onAddTag,
+  onRenameTag,
+  onRemoveTag
 }: SidebarProps): ReactElement {
-  const [addingCategory, setAddingCategory] = useState(false)
-  const [newCategoryName, setNewCategoryName] = useState('')
-  const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null)
-  const [editingCategoryName, setEditingCategoryName] = useState('')
+  const [addingTag, setAddingTag] = useState(false)
+  const [newTagName, setNewTagName] = useState('')
+  const [editingTagId, setEditingTagId] = useState<string | null>(null)
+  const [editingTagName, setEditingTagName] = useState('')
 
-  const uncategorizedCount = entries.filter((e) => e.category === '').length
+  const untaggedCount = entries.filter((e) => e.tags.length === 0).length
 
-  function commitNewCategory(): void {
-    const trimmed = newCategoryName.trim()
-    if (trimmed) onAddCategory(trimmed)
-    setNewCategoryName('')
-    setAddingCategory(false)
+  function commitNewTag(): void {
+    const trimmed = newTagName.trim()
+    if (trimmed) onAddTag(trimmed)
+    setNewTagName('')
+    setAddingTag(false)
   }
 
   function commitRename(): void {
-    if (!editingCategoryId) return
-    const trimmed = editingCategoryName.trim()
-    if (trimmed) onRenameCategory(editingCategoryId, trimmed)
-    setEditingCategoryId(null)
+    if (!editingTagId) return
+    const trimmed = editingTagName.trim()
+    if (trimmed) onRenameTag(editingTagId, trimmed)
+    setEditingTagId(null)
   }
 
   return (
@@ -102,9 +102,9 @@ export function Sidebar({
 
       <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto">
         <button
-          onClick={() => onSelectCategory(null)}
+          onClick={() => onSelectTag(null)}
           className={`rounded-lg px-2 py-1.5 text-left text-sm transition ${
-            selectedCategoryId === null
+            selectedTagId === null
               ? 'bg-panel-active text-text'
               : 'text-text-muted hover:bg-panel-hover hover:text-text'
           }`}
@@ -112,25 +112,25 @@ export function Sidebar({
           Alle <span className="text-text-muted">({entries.length})</span>
         </button>
         <button
-          onClick={() => onSelectCategory('')}
+          onClick={() => onSelectTag('')}
           className={`rounded-lg px-2 py-1.5 text-left text-sm transition ${
-            selectedCategoryId === ''
+            selectedTagId === ''
               ? 'bg-panel-active text-text'
               : 'text-text-muted hover:bg-panel-hover hover:text-text'
           }`}
         >
-          Unsortiert <span className="text-text-muted">({uncategorizedCount})</span>
+          Unsortiert <span className="text-text-muted">({untaggedCount})</span>
         </button>
 
-        {categories.map((category, index) => {
-          const count = entries.filter((e) => e.category === category.id).length
-          const isEditing = editingCategoryId === category.id
+        {tags.map((tag, index) => {
+          const count = entries.filter((e) => e.tags.includes(tag.id)).length
+          const isEditing = editingTagId === tag.id
           const dotColor = DOT_COLORS[index % DOT_COLORS.length]
           return (
             <div
-              key={category.id}
+              key={tag.id}
               className={`group flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm transition ${
-                selectedCategoryId === category.id
+                selectedTagId === tag.id
                   ? 'bg-panel-active text-text'
                   : 'text-text-muted hover:bg-panel-hover hover:text-text'
               }`}
@@ -138,38 +138,35 @@ export function Sidebar({
               {isEditing ? (
                 <input
                   autoFocus
-                  value={editingCategoryName}
-                  onChange={(e) => setEditingCategoryName(e.target.value)}
+                  value={editingTagName}
+                  onChange={(e) => setEditingTagName(e.target.value)}
                   onBlur={commitRename}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') commitRename()
-                    if (e.key === 'Escape') setEditingCategoryId(null)
+                    if (e.key === 'Escape') setEditingTagId(null)
                   }}
                   className="w-full rounded bg-panel-hover px-1 text-sm text-text outline-none"
                 />
               ) : (
                 <>
                   <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${dotColor}`} />
-                  <button
-                    onClick={() => onSelectCategory(category.id)}
-                    className="flex-1 truncate text-left"
-                  >
-                    {category.name} <span className="text-text-muted">({count})</span>
+                  <button onClick={() => onSelectTag(tag.id)} className="flex-1 truncate text-left">
+                    {tag.name} <span className="text-text-muted">({count})</span>
                   </button>
                   <button
                     onClick={() => {
-                      setEditingCategoryId(category.id)
-                      setEditingCategoryName(category.name)
+                      setEditingTagId(tag.id)
+                      setEditingTagName(tag.name)
                     }}
                     title="Umbenennen"
-                    className="hidden p-0.5 text-text-muted hover:text-cyan group-hover:inline-flex"
+                    className="hidden p-0.5 text-text-muted hover:text-cyan group-hover:inline-flex group-focus-within:inline-flex"
                   >
                     <IconEdit className="h-3.5 w-3.5" />
                   </button>
                   <button
-                    onClick={() => onRemoveCategory(category.id)}
+                    onClick={() => onRemoveTag(tag.id)}
                     title="Löschen"
-                    className="hidden p-0.5 text-text-muted hover:text-pink group-hover:inline-flex"
+                    className="hidden p-0.5 text-text-muted hover:text-pink group-hover:inline-flex group-focus-within:inline-flex"
                   >
                     <IconTrash className="h-3.5 w-3.5" />
                   </button>
@@ -180,27 +177,27 @@ export function Sidebar({
         })}
       </nav>
 
-      {addingCategory ? (
+      {addingTag ? (
         <input
           autoFocus
-          value={newCategoryName}
-          onChange={(e) => setNewCategoryName(e.target.value)}
-          onBlur={commitNewCategory}
+          value={newTagName}
+          onChange={(e) => setNewTagName(e.target.value)}
+          onBlur={commitNewTag}
           onKeyDown={(e) => {
-            if (e.key === 'Enter') commitNewCategory()
-            if (e.key === 'Escape') setAddingCategory(false)
+            if (e.key === 'Enter') commitNewTag()
+            if (e.key === 'Escape') setAddingTag(false)
           }}
-          placeholder="Neue Kategorie"
+          placeholder="Neuer Tag"
           className="rounded-lg border border-border bg-panel px-2 py-1 text-sm text-text outline-none focus:border-cyan/50"
         />
       ) : (
         <button
-          onClick={() => setAddingCategory(true)}
-          title="Kategorie hinzufügen"
+          onClick={() => setAddingTag(true)}
+          title="Tag hinzufügen"
           className="flex items-center gap-1.5 rounded-lg px-2 py-1 text-sm text-text-muted transition hover:bg-panel-hover hover:text-cyan"
         >
           <IconPlus className="h-3.5 w-3.5" />
-          Kategorie
+          Tag
         </button>
       )}
     </aside>

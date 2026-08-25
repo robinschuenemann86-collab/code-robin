@@ -9,7 +9,7 @@ const EntrySchema = z.object({
   name: z.string().min(1),
   path: z.string().min(1),
   iconHash: z.string().nullable(),
-  category: z.string(),
+  tags: z.array(z.string()).default([]),
   addedAt: z.number(),
   // Nur gesetzt für per Scanner importierte Steam-Spiele. Diese werden über
   // steam://rungameid/<id> gestartet, nicht direkt über einen Programmpfad.
@@ -22,7 +22,7 @@ const EntrySchema = z.object({
   expectedProcessName: z.string().nullable().default(null)
 })
 
-const CategorySchema = z.object({
+const TagSchema = z.object({
   id: z.string(),
   name: z.string().min(1)
 })
@@ -35,24 +35,44 @@ const SessionSchema = z.object({
 })
 
 const StoreDataSchema = z.object({
-  version: z.literal(1),
+  version: z.literal(2),
   entries: z.array(EntrySchema),
-  categories: z.array(CategorySchema),
+  tags: z.array(TagSchema),
   sessions: z.array(SessionSchema),
   settings: z.record(z.string(), z.unknown())
 })
 
 export type Entry = z.infer<typeof EntrySchema>
-export type Category = z.infer<typeof CategorySchema>
+export type Tag = z.infer<typeof TagSchema>
 export type Session = z.infer<typeof SessionSchema>
 export type StoreData = z.infer<typeof StoreDataSchema>
 
 const defaults: StoreData = {
-  version: 1,
+  version: 2,
   entries: [],
-  categories: [],
+  tags: [],
   sessions: [],
   settings: {}
+}
+
+// Stand vor Tags: Einträge hatten ein einzelnes `category`-Feld, Kategorien
+// lagen unter dem Schlüssel `categories`. Wird nur einmal beim ersten Start
+// nach dem Update durchlaufen (danach steht schon version: 2 in der Datei).
+function migrateToV2(raw: Record<string, unknown>): Record<string, unknown> {
+  if (raw.version === 2) return raw
+
+  const oldTags = Array.isArray(raw.categories) ? raw.categories : []
+  const oldEntries = Array.isArray(raw.entries) ? raw.entries : []
+
+  return {
+    ...raw,
+    version: 2,
+    tags: oldTags,
+    entries: oldEntries.map((entry: Record<string, unknown>) => {
+      const { category, ...rest } = entry
+      return { ...rest, tags: typeof category === 'string' && category ? [category] : [] }
+    })
+  }
 }
 
 let store: Store<StoreData>
@@ -64,10 +84,15 @@ export function initStore(): Store<StoreData> {
 
   try {
     store = new Store<StoreData>({ defaults, clearInvalidConfig: false })
-    const parsed = StoreDataSchema.safeParse(store.store)
+    const migrated = migrateToV2(store.store as unknown as Record<string, unknown>)
+    const parsed = StoreDataSchema.safeParse(migrated)
     if (!parsed.success) {
       throw new Error(parsed.error.message)
     }
+    // Setzt die komplette Datei neu (nicht nur einzelne Schlüssel), damit
+    // Altlasten wie ein verwaistes `categories`-Feld nach der Migration
+    // wirklich verschwinden statt liegen zu bleiben.
+    store.store = parsed.data
   } catch (error) {
     if (existsSync(configFile)) {
       copyFileSync(configFile, `${configFile}.broken-${Date.now()}.bak`)
@@ -123,13 +148,13 @@ export function setEntries(entries: Entry[]): void {
   store.set('entries', parsed.data.entries)
 }
 
-export function setCategories(categories: Category[]): void {
-  const draft = { ...store.store, categories }
+export function setTags(tags: Tag[]): void {
+  const draft = { ...store.store, tags }
   const parsed = StoreDataSchema.safeParse(draft)
   if (!parsed.success) {
-    throw new Error(`Ungültige Kategoriedaten: ${parsed.error.message}`)
+    throw new Error(`Ungültige Tag-Daten: ${parsed.error.message}`)
   }
-  store.set('categories', categories)
+  store.set('tags', tags)
 }
 
 export function setSessions(sessions: Session[]): void {

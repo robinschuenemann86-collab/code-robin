@@ -3,12 +3,12 @@ export interface Entry {
   name: string
   path: string
   iconHash: string | null
-  category: string
+  tags: string[]
   addedAt: number
   favorite: boolean
 }
 
-export interface Category {
+export interface Tag {
   id: string
   name: string
 }
