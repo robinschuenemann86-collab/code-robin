@@ -36,7 +36,11 @@ function createWindow(): void {
   })
 
   mainWindow.on('ready-to-show', () => {
-    mainWindow?.show()
+    // Beim automatischen Start mit Windows bleibt das Fenster versteckt im
+    // Tray, statt sich jedes Mal beim Hochfahren aufzudrängen.
+    if (!app.getLoginItemSettings().wasOpenedAtLogin) {
+      mainWindow?.show()
+    }
   })
 
   mainWindow.on('closed', () => {

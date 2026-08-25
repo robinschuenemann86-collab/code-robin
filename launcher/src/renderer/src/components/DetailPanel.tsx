@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactElement } from 'react'
 import type { Entry, EntryStats, Tag } from '../types'
 import { EntryIcon } from './EntryIcon'
 import {
+  IconAlertTriangle,
   IconCalendar,
   IconClock,
   IconDisc,
@@ -23,6 +24,7 @@ function formatSize(bytes: number): string {
 interface DetailPanelProps {
   entry: Entry
   tags: Tag[]
+  pathMissing: boolean
   stats: EntryStats | null
   onLaunch: (entry: Entry) => void
   onRename: (id: string, name: string) => void
@@ -43,6 +45,7 @@ function formatDuration(ms: number): string {
 export function DetailPanel({
   entry,
   tags,
+  pathMissing,
   stats,
   onLaunch,
   onRename,
@@ -80,6 +83,13 @@ export function DetailPanel({
           <IconX className="h-4 w-4" />
         </button>
       </div>
+
+      {pathMissing && (
+        <div className="flex items-center gap-2 rounded-lg border border-amber/40 bg-amber/10 p-2 text-xs text-amber">
+          <IconAlertTriangle className="h-4 w-4 shrink-0" />
+          Pfad nicht gefunden — das Programm wurde vermutlich verschoben oder deinstalliert.
+        </div>
+      )}
 
       <div className="flex flex-col items-center gap-3">
         <EntryIcon iconHash={entry.iconHash} className="h-20 w-20" />
@@ -160,10 +170,10 @@ export function DetailPanel({
         {size === 'loading' ? 'Größe wird berechnet …' : size === null ? 'Größe unbekannt' : formatSize(size)}
       </div>
 
-      {stats && stats.totalPlayedMs > 0 && (
+      {stats && stats.launchCount > 0 && (
         <div className="flex items-center gap-2 text-xs text-text-muted">
           <IconClock className="h-4 w-4 shrink-0" />
-          {formatDuration(stats.totalPlayedMs)}
+          {formatDuration(stats.totalPlayedMs)} · {stats.launchCount}× gestartet
           {stats.lastPlayedAt &&
             ` · zuletzt ${new Date(stats.lastPlayedAt).toLocaleDateString('de-DE')}`}
         </div>

@@ -192,6 +192,16 @@ async function getEntrySize(id: string): Promise<number | null> {
   }
 }
 
+// Für Steam-/Epic-Einträge ist ein fehlender Pfad kein Problem — die starten
+// über den jeweiligen Client, nicht über den gespeicherten Ordner.
+function checkEntryPaths(): Record<string, boolean> {
+  const result: Record<string, boolean> = {}
+  for (const entry of getStore().get('entries')) {
+    result[entry.id] = Boolean(entry.steamAppId || entry.epicAppName || existsSync(entry.path))
+  }
+  return result
+}
+
 export function showEntryInExplorer(id: string): void {
   const entry = getStore()
     .get('entries')
@@ -229,4 +239,6 @@ export function registerEntryHandlers(getWindow: () => BrowserWindow | null): vo
   ipcMain.handle('entries:addPaths', (_event, paths: string[]) => addEntriesFromPaths(paths))
 
   ipcMain.on('entries:showInExplorer', (_event, id: string) => showEntryInExplorer(id))
+
+  ipcMain.handle('entries:checkPaths', () => checkEntryPaths())
 }

@@ -1,4 +1,4 @@
-import { ipcMain, Menu, type BrowserWindow } from 'electron'
+import { app, ipcMain, Menu, type BrowserWindow } from 'electron'
 import { exportBackup, importBackup } from './backup'
 
 export function registerAppMenuHandlers(getWindow: () => BrowserWindow | null): void {
@@ -7,6 +7,13 @@ export function registerAppMenuHandlers(getWindow: () => BrowserWindow | null): 
     if (!window) return
 
     const menu = Menu.buildFromTemplate([
+      {
+        label: 'Bei Windows-Start öffnen',
+        type: 'checkbox',
+        checked: app.getLoginItemSettings().openAtLogin,
+        click: (menuItem) => app.setLoginItemSettings({ openAtLogin: menuItem.checked })
+      },
+      { type: 'separator' },
       { label: 'Daten sichern…', click: () => exportBackup(window) },
       {
         label: 'Daten wiederherstellen…',

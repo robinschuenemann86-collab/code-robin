@@ -34,4 +34,5 @@ export interface EntryStats {
   entryId: string
   totalPlayedMs: number
   lastPlayedAt: number | null
+  launchCount: number
 }

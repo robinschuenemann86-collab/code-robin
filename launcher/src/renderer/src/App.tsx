@@ -8,6 +8,7 @@ import { ScannerDialog } from './components/ScannerDialog'
 import { StatsDialog } from './components/StatsDialog'
 import { BigPictureView } from './components/BigPictureView'
 import {
+  IconAlertTriangle,
   IconClock,
   IconExpand,
   IconMore,
@@ -36,6 +37,7 @@ function App(): ReactElement {
   const [sortMode, setSortMode] = useState<SortMode>('added')
   const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null)
   const [draggingOver, setDraggingOver] = useState(false)
+  const [missingPaths, setMissingPaths] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     Promise.all([window.api.listEntries(), window.api.listTags(), window.api.listStats()]).then(
@@ -61,6 +63,14 @@ function App(): ReactElement {
   useEffect(() => {
     return window.api.onEntriesChanged(setEntries)
   }, [])
+
+  // Prüft erneut, sobald sich die Liste ändert (z. B. nach einer
+  // Wiederherstellung auf diesem Rechner oder wenn ein Spiel deinstalliert wurde).
+  useEffect(() => {
+    window.api.checkEntryPaths().then((result) => {
+      setMissingPaths(new Set(Object.keys(result).filter((id) => !result[id])))
+    })
+  }, [entries])
 
   // Spielzeit läuft im Hintergrund weiter (Prozess-Polling im Main-Prozess),
   // daher hier frisch nachladen statt die Werte vom App-Start zu behalten.
@@ -437,7 +447,15 @@ function App(): ReactElement {
                     <IconTrash className="h-3.5 w-3.5" />
                   </button>
                   <EntryIcon iconHash={entry.iconHash} />
-                  <span className="truncate text-sm font-medium">{entry.name}</span>
+                  <span className="flex max-w-full items-center gap-1 truncate text-sm font-medium">
+                    {missingPaths.has(entry.id) && (
+                      <IconAlertTriangle
+                        className="h-3.5 w-3.5 shrink-0 text-amber"
+                        title="Pfad nicht gefunden"
+                      />
+                    )}
+                    <span className="truncate">{entry.name}</span>
+                  </span>
                 </div>
               ))}
             </div>
@@ -459,7 +477,15 @@ function App(): ReactElement {
                   }`}
                 >
                   <EntryIcon iconHash={entry.iconHash} className="h-8 w-8" />
-                  <span className="flex-1 truncate text-sm font-medium">{entry.name}</span>
+                  <span className="flex flex-1 items-center gap-1.5 truncate text-sm font-medium">
+                    {missingPaths.has(entry.id) && (
+                      <IconAlertTriangle
+                        className="h-3.5 w-3.5 shrink-0 text-amber"
+                        title="Pfad nicht gefunden"
+                      />
+                    )}
+                    <span className="truncate">{entry.name}</span>
+                  </span>
                   <span className="truncate text-xs text-text-muted">
                     {entry.tags.length > 0
                       ? entry.tags
@@ -503,6 +529,7 @@ function App(): ReactElement {
             key={selectedEntry.id}
             entry={selectedEntry}
             tags={tags}
+            pathMissing={missingPaths.has(selectedEntry.id)}
             stats={stats.find((s) => s.entryId === selectedEntry.id) ?? null}
             onLaunch={handleLaunch}
             onRename={handleRename}

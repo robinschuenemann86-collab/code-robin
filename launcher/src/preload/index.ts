@@ -26,6 +26,7 @@ const api = {
     ipcRenderer.on('entries:changed', listener)
     return () => ipcRenderer.removeListener('entries:changed', listener)
   },
+  checkEntryPaths: (): Promise<Record<string, boolean>> => ipcRenderer.invoke('entries:checkPaths'),
 
   listTags: (): Promise<Tag[]> => ipcRenderer.invoke('tags:list'),
   addTag: (name: string): Promise<Tag[]> => ipcRenderer.invoke('tags:add', name),

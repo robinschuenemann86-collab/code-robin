@@ -54,6 +54,7 @@ export function StatsDialog({ entries, stats, onClose }: StatsDialogProps): Reac
                   <EntryIcon iconHash={entry.iconHash} className="h-8 w-8" />
                   <span className="flex-1 truncate text-sm">{entry.name}</span>
                   <span className="text-xs text-text-muted">
+                    {stat.launchCount}× ·{' '}
                     {stat.lastPlayedAt && new Date(stat.lastPlayedAt).toLocaleDateString('de-DE')}
                   </span>
                   <span className="text-sm text-cyan">{formatDuration(stat.totalPlayedMs)}</span>
