@@ -5,7 +5,7 @@ import { basename, dirname, extname, join } from 'path'
 import { readdir, stat } from 'fs/promises'
 import { existsSync } from 'fs'
 import { getStore, setEntries, type Entry } from './store'
-import { ensureIconCached, removeCachedIcon } from './icons'
+import { ensureIconCached, removeCachedIcon, setCustomIcon } from './icons'
 import { startSession } from './playtime'
 
 function deriveName(targetPath: string): string {
@@ -202,6 +202,35 @@ function checkEntryPaths(): Record<string, boolean> {
   return result
 }
 
+export async function pickCustomIcon(window: BrowserWindow, id: string): Promise<Entry[]> {
+  const entries = getStore().get('entries')
+  const entry = entries.find((e) => e.id === id)
+  if (!entry) {
+    throw new Error('Eintrag wurde nicht gefunden.')
+  }
+
+  const result = await dialog.showOpenDialog(window, {
+    title: 'Icon auswählen',
+    properties: ['openFile'],
+    filters: [{ name: 'Bilder', extensions: ['png', 'jpg', 'jpeg', 'ico', 'bmp'] }]
+  })
+  if (result.canceled || result.filePaths.length === 0) return entries
+
+  const newHash = await setCustomIcon(id, result.filePaths[0])
+  if (!newHash) return entries
+
+  const oldHash = entry.iconHash
+  const updated = entries.map((e) => (e.id === id ? { ...e, iconHash: newHash } : e))
+  setEntries(updated)
+
+  const oldHashStillUsed = oldHash !== null && updated.some((e) => e.iconHash === oldHash)
+  if (oldHash && !oldHashStillUsed) {
+    await removeCachedIcon(oldHash)
+  }
+
+  return updated
+}
+
 export function showEntryInExplorer(id: string): void {
   const entry = getStore()
     .get('entries')
@@ -241,4 +270,12 @@ export function registerEntryHandlers(getWindow: () => BrowserWindow | null): vo
   ipcMain.on('entries:showInExplorer', (_event, id: string) => showEntryInExplorer(id))
 
   ipcMain.handle('entries:checkPaths', () => checkEntryPaths())
+
+  ipcMain.handle('entries:pickCustomIcon', (_event, id: string) => {
+    const window = getWindow()
+    if (!window) {
+      throw new Error('Kein Fenster verfügbar.')
+    }
+    return pickCustomIcon(window, id)
+  })
 }

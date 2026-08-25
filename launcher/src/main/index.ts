@@ -14,6 +14,7 @@ import { registerTray, unregisterHotkey } from './tray'
 import { registerFullscreenHandlers, forwardFullscreenEvents } from './fullscreen'
 import { registerContextMenuHandlers } from './contextMenu'
 import { registerAppMenuHandlers } from './appMenu'
+import { loadWindowBounds, saveWindowBounds } from './windowBounds'
 
 registerIconProtocolScheme()
 
@@ -21,9 +22,13 @@ let mainWindow: BrowserWindow | null = null
 let isQuitting = false
 
 function createWindow(): void {
+  const bounds = loadWindowBounds()
+
   mainWindow = new BrowserWindow({
-    width: 900,
-    height: 670,
+    x: bounds.x,
+    y: bounds.y,
+    width: bounds.width,
+    height: bounds.height,
     show: false,
     autoHideMenuBar: true,
     ...(process.platform === 'linux' ? { icon } : {}),
@@ -36,6 +41,9 @@ function createWindow(): void {
   })
 
   mainWindow.on('ready-to-show', () => {
+    if (bounds.isMaximized) {
+      mainWindow?.maximize()
+    }
     // Beim automatischen Start mit Windows bleibt das Fenster versteckt im
     // Tray, statt sich jedes Mal beim Hochfahren aufzudrängen.
     if (!app.getLoginItemSettings().wasOpenedAtLogin) {
@@ -48,8 +56,10 @@ function createWindow(): void {
   })
 
   // Fenster-X minimiert in den Tray statt die App zu beenden — wirklich
-  // beendet wird nur über "Beenden" im Tray-Menü (setzt isQuitting).
+  // beendet wird nur über "Beenden" im Tray-Menü (setzt isQuitting). Größe/
+  // Position werden in jedem Fall gesichert, bevor das Fenster verschwindet.
   mainWindow.on('close', (event) => {
+    if (mainWindow) saveWindowBounds(mainWindow)
     if (!isQuitting) {
       event.preventDefault()
       mainWindow?.hide()

@@ -16,6 +16,7 @@ export interface LauncherApi {
   showEntryInExplorer: (id: string) => void
   onEntriesChanged: (callback: (entries: Entry[]) => void) => () => void
   checkEntryPaths: () => Promise<Record<string, boolean>>
+  pickCustomIcon: (id: string) => Promise<Entry[]>
 
   listTags: () => Promise<Tag[]>
   addTag: (name: string) => Promise<Tag[]>

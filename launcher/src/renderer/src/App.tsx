@@ -19,6 +19,12 @@ import {
 } from './components/icons'
 import logo from './assets/logo.png'
 
+const NEW_THRESHOLD_MS = 48 * 60 * 60 * 1000
+
+function isNewEntry(entry: Entry): boolean {
+  return Date.now() - entry.addedAt < NEW_THRESHOLD_MS
+}
+
 function App(): ReactElement {
   const [entries, setEntries] = useState<Entry[]>([])
   const [tags, setTags] = useState<Tag[]>([])
@@ -168,6 +174,10 @@ function App(): ReactElement {
 
   async function handleRename(id: string, name: string): Promise<void> {
     setEntries(await window.api.renameEntry(id, name))
+  }
+
+  async function handleChangeIcon(id: string): Promise<void> {
+    setEntries(await window.api.pickCustomIcon(id))
   }
 
   async function handleInstallUpdate(): Promise<void> {
@@ -446,7 +456,14 @@ function App(): ReactElement {
                   >
                     <IconTrash className="h-3.5 w-3.5" />
                   </button>
-                  <EntryIcon iconHash={entry.iconHash} />
+                  <div className="relative">
+                    <EntryIcon iconHash={entry.iconHash} />
+                    {isNewEntry(entry) && (
+                      <span className="absolute -right-1 -top-1 rounded-full bg-pink px-1.5 py-0.5 text-[9px] font-semibold leading-none text-white">
+                        NEU
+                      </span>
+                    )}
+                  </div>
                   <span className="flex max-w-full items-center gap-1 truncate text-sm font-medium">
                     {missingPaths.has(entry.id) && (
                       <IconAlertTriangle
@@ -485,6 +502,11 @@ function App(): ReactElement {
                       />
                     )}
                     <span className="truncate">{entry.name}</span>
+                    {isNewEntry(entry) && (
+                      <span className="shrink-0 rounded-full bg-pink px-1.5 py-0.5 text-[9px] font-semibold leading-none text-white">
+                        NEU
+                      </span>
+                    )}
                   </span>
                   <span className="truncate text-xs text-text-muted">
                     {entry.tags.length > 0
@@ -534,6 +556,7 @@ function App(): ReactElement {
             onLaunch={handleLaunch}
             onRename={handleRename}
             onToggleTag={handleToggleTag}
+            onChangeIcon={handleChangeIcon}
             onToggleFavorite={handleToggleFavorite}
             onRemove={handleDelete}
             onClose={() => setSelectedEntryId(null)}

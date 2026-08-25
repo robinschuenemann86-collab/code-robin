@@ -178,3 +178,12 @@ export function setSessions(sessions: Session[]): void {
   }
   store.set('sessions', sessions)
 }
+
+export function setSettings(settings: StoreData['settings']): void {
+  const draft = { ...store.store, settings }
+  const parsed = StoreDataSchema.safeParse(draft)
+  if (!parsed.success) {
+    throw new Error(`Ungültige Einstellungsdaten: ${parsed.error.message}`)
+  }
+  store.set('settings', settings)
+}

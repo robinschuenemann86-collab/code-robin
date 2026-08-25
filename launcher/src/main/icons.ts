@@ -73,6 +73,22 @@ export async function ensureSteamIconCached(
   return null
 }
 
+// Erzeugt bewusst einen neuen, bisher unbenutzten Hash statt den vorhandenen
+// pfadbasierten wiederzuverwenden — sonst würde der Renderer wegen des
+// identischen `launcher-icon://<hash>`-Links das alte Bild aus dem
+// Cache weiterzeigen, obwohl die Datei dahinter schon ausgetauscht wurde.
+export async function setCustomIcon(entryId: string, imagePath: string): Promise<string | null> {
+  const hash = hashPath(`custom:${entryId}:${Date.now()}`)
+  try {
+    const image = nativeImage.createFromPath(imagePath)
+    if (image.isEmpty()) return null
+    await fs.writeFile(iconFilePath(hash), image.toPNG())
+    return hash
+  } catch {
+    return null
+  }
+}
+
 export async function removeCachedIcon(hash: string): Promise<void> {
   const file = iconFilePath(hash)
   try {

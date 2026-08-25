@@ -1,6 +1,6 @@
 import { ipcMain, Menu, dialog, shell, type BrowserWindow } from 'electron'
 import { getStore } from './store'
-import { launchEntry, toggleFavorite, toggleEntryTag, removeEntry } from './entries'
+import { launchEntry, toggleFavorite, toggleEntryTag, removeEntry, pickCustomIcon } from './entries'
 
 export function registerContextMenuHandlers(getWindow: () => BrowserWindow | null): void {
   ipcMain.on('contextMenu:showForEntry', (_event, id: string) => {
@@ -40,6 +40,7 @@ export function registerContextMenuHandlers(getWindow: () => BrowserWindow | nul
         : []),
       { type: 'separator' },
       { label: 'Im Explorer anzeigen', click: () => shell.showItemInFolder(entry.path) },
+      { label: 'Icon ändern…', click: () => pickCustomIcon(window, id).then(notify) },
       { type: 'separator' },
       {
         label: 'Entfernen',
