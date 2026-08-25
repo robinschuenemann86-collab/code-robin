@@ -1,5 +1,5 @@
-appId: com.electron.app
-productName: launcher
+appId: de.robinschuenemann.mrlauncher
+productName: MR Launch
 directories:
   buildResources: build
 files:
@@ -39,5 +39,6 @@ appImage:
   artifactName: ${name}-${version}.${ext}
 npmRebuild: false
 publish:
-  provider: generic
-  url: https://example.com/auto-updates
+  provider: github
+  owner: robinschuenemann86-collab
+  repo: code-robin

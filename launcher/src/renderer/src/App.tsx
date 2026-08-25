@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState, type ReactElement } from 'react'
 import type { Category, Entry, EntryStats, ViewMode } from './types'
+import type { UpdaterStatus } from '../../main/updater'
 import { EntryIcon } from './components/EntryIcon'
 import { Sidebar } from './components/Sidebar'
 import { DetailPanel } from './components/DetailPanel'
 import { ScannerDialog } from './components/ScannerDialog'
 import { StatsDialog } from './components/StatsDialog'
 import { IconClock, IconPlus, IconSearch, IconStar, IconTrash } from './components/icons'
+import logo from './assets/logo.png'
 
 function App(): ReactElement {
   const [entries, setEntries] = useState<Entry[]>([])
@@ -15,6 +17,7 @@ function App(): ReactElement {
   const [status, setStatus] = useState('')
   const [scannerOpen, setScannerOpen] = useState(false)
   const [statsOpen, setStatsOpen] = useState(false)
+  const [updaterStatus, setUpdaterStatus] = useState<UpdaterStatus | null>(null)
 
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null)
@@ -33,6 +36,10 @@ function App(): ReactElement {
       setStats(loadedStats)
       setLoading(false)
     })
+  }, [])
+
+  useEffect(() => {
+    return window.api.onUpdaterStatus(setUpdaterStatus)
   }, [])
 
   // Spielzeit läuft im Hintergrund weiter (Prozess-Polling im Main-Prozess),
@@ -83,6 +90,10 @@ function App(): ReactElement {
 
   async function handleRename(id: string, name: string): Promise<void> {
     setEntries(await window.api.renameEntry(id, name))
+  }
+
+  async function handleInstallUpdate(): Promise<void> {
+    await window.api.installUpdate()
   }
 
   async function handleSetCategory(id: string, categoryId: string): Promise<void> {
@@ -160,9 +171,12 @@ function App(): ReactElement {
   return (
     <div className="flex h-screen flex-col bg-base text-text">
       <header className="flex items-center justify-between px-8 py-5">
-        <div>
-          <h1 className="text-lg font-semibold tracking-tight">Launcher</h1>
-          <p className="text-sm text-text-muted">{entries.length} Programme</p>
+        <div className="flex items-center gap-3">
+          <img src={logo} alt="" className="h-20 w-20 rounded-md object-cover" />
+          <div>
+            <h1 className="text-lg font-semibold tracking-tight">MR Launch</h1>
+            <p className="text-sm text-text-muted">{entries.length} Programme</p>
+          </div>
         </div>
         <div className="flex gap-2">
           <button
@@ -188,6 +202,24 @@ function App(): ReactElement {
           </button>
         </div>
       </header>
+
+      {updaterStatus?.state === 'downloading' && (
+        <div className="flex items-center justify-between bg-panel px-8 py-2 text-sm text-text-muted">
+          <span>Update wird heruntergeladen … {updaterStatus.percent}%</span>
+        </div>
+      )}
+      {updaterStatus?.state === 'downloaded' && (
+        <div className="flex items-center justify-between bg-panel px-8 py-2 text-sm text-text">
+          <span>Update auf Version {updaterStatus.version} ist bereit.</span>
+          <button
+            onClick={handleInstallUpdate}
+            className="rounded-lg bg-pink px-3 py-1.5 text-sm text-white transition hover:brightness-110"
+          >
+            Jetzt neu starten
+          </button>
+        </div>
+      )}
+
       <div className="divider" />
 
       <div className="flex min-h-0 flex-1">

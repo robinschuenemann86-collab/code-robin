@@ -9,6 +9,7 @@ import { registerScannerHandlers } from './scanner'
 import { registerStatsHandlers } from './stats'
 import { closeDanglingSessions } from './playtime'
 import { registerIconProtocolScheme, registerIconProtocolHandler } from './iconProtocol'
+import { registerUpdaterHandlers } from './updater'
 
 registerIconProtocolScheme()
 
@@ -56,7 +57,7 @@ function createWindow(): void {
 // Some APIs can only be used after this event occurs.
 app.whenReady().then(() => {
   // Set app user model id for windows
-  electronApp.setAppUserModelId('com.electron')
+  electronApp.setAppUserModelId('de.robinschuenemann.mrlauncher')
 
   // Default open or close DevTools by F12 in development
   // and ignore CommandOrControl + R in production.
@@ -72,6 +73,7 @@ app.whenReady().then(() => {
   registerCategoryHandlers()
   registerScannerHandlers()
   registerStatsHandlers()
+  registerUpdaterHandlers(() => mainWindow)
 
   createWindow()
 

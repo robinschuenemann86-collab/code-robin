@@ -3,8 +3,8 @@
   "version": "1.0.0",
   "description": "An Electron application with React and TypeScript",
   "main": "./out/main/index.js",
-  "author": "example.com",
-  "homepage": "https://electron-vite.org",
+  "author": "Robin Schünemann",
+  "homepage": "https://github.com/robinschuenemann86-collab/code-robin",
   "scripts": {
     "format": "prettier --write .",
     "lint": "eslint --cache .",
@@ -24,6 +24,7 @@
     "@electron-toolkit/preload": "^3.0.2",
     "@electron-toolkit/utils": "^4.0.0",
     "electron-store": "^8.2.0",
+    "electron-updater": "^6.8.9",
     "zod": "^4.4.3"
   },
   "devDependencies": {

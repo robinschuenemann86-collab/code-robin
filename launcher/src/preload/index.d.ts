@@ -1,6 +1,7 @@
 import type { Entry, Category } from '../main/store'
 import type { Candidate } from '../main/scanner'
 import type { EntryStats } from '../main/stats'
+import type { UpdaterStatus } from '../main/updater'
 
 export interface LauncherApi {
   listEntries: () => Promise<Entry[]>
@@ -20,6 +21,9 @@ export interface LauncherApi {
   importCandidates: (candidates: Candidate[]) => Promise<Entry[]>
 
   listStats: () => Promise<EntryStats[]>
+
+  onUpdaterStatus: (callback: (status: UpdaterStatus) => void) => () => void
+  installUpdate: () => Promise<void>
 }
 
 declare global {
