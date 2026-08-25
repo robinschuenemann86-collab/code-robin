@@ -15,6 +15,8 @@ export interface Tag {
 
 export type ViewMode = 'grid' | 'list'
 
+export type SortMode = 'name' | 'recent' | 'playtime' | 'added'
+
 export interface Candidate {
   key: string
   name: string

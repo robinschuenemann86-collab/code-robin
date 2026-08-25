@@ -1,5 +1,5 @@
 import { useState, type ReactElement } from 'react'
-import type { Entry, Tag, ViewMode } from '../types'
+import type { Entry, SortMode, Tag, ViewMode } from '../types'
 import { IconEdit, IconGrid, IconList, IconPlus, IconSearch, IconStar, IconTrash } from './icons'
 
 interface SidebarProps {
@@ -13,6 +13,8 @@ interface SidebarProps {
   onViewModeChange: (mode: ViewMode) => void
   favoritesOnly: boolean
   onFavoritesOnlyChange: (value: boolean) => void
+  sortMode: SortMode
+  onSortModeChange: (mode: SortMode) => void
   onAddTag: (name: string) => void
   onRenameTag: (id: string, name: string) => void
   onRemoveTag: (id: string) => void
@@ -33,6 +35,8 @@ export function Sidebar({
   onViewModeChange,
   favoritesOnly,
   onFavoritesOnlyChange,
+  sortMode,
+  onSortModeChange,
   onAddTag,
   onRenameTag,
   onRemoveTag
@@ -99,6 +103,17 @@ export function Sidebar({
           <IconStar className="h-4 w-4" filled={favoritesOnly} />
         </button>
       </div>
+
+      <select
+        value={sortMode}
+        onChange={(e) => onSortModeChange(e.target.value as SortMode)}
+        className="rounded-lg border border-border bg-panel px-2 py-1.5 text-sm text-text outline-none focus:border-cyan/50"
+      >
+        <option value="added">Zuletzt hinzugefügt</option>
+        <option value="name">Name (A-Z)</option>
+        <option value="recent">Zuletzt gespielt</option>
+        <option value="playtime">Spielzeit</option>
+      </select>
 
       <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto">
         <button

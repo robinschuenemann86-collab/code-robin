@@ -75,6 +75,18 @@ function migrateToV2(raw: Record<string, unknown>): Record<string, unknown> {
   }
 }
 
+// Wandelt rohe (evtl. veraltete oder aus einer Sicherung stammende) Daten in
+// einen gültigen, aktuellen Datenbestand um. Wirft, wenn das auch nach der
+// Migration nicht gelingt — von initStore() und vom Backup-Import genutzt.
+export function parseStoreData(raw: unknown): StoreData {
+  const migrated = migrateToV2(raw as Record<string, unknown>)
+  const parsed = StoreDataSchema.safeParse(migrated)
+  if (!parsed.success) {
+    throw new Error(parsed.error.message)
+  }
+  return parsed.data
+}
+
 let store: Store<StoreData>
 
 // Legt bei einer kaputten Datei ein Backup an und startet mit leeren Daten neu,
@@ -84,15 +96,10 @@ export function initStore(): Store<StoreData> {
 
   try {
     store = new Store<StoreData>({ defaults, clearInvalidConfig: false })
-    const migrated = migrateToV2(store.store as unknown as Record<string, unknown>)
-    const parsed = StoreDataSchema.safeParse(migrated)
-    if (!parsed.success) {
-      throw new Error(parsed.error.message)
-    }
     // Setzt die komplette Datei neu (nicht nur einzelne Schlüssel), damit
     // Altlasten wie ein verwaistes `categories`-Feld nach der Migration
     // wirklich verschwinden statt liegen zu bleiben.
-    store.store = parsed.data
+    store.store = parseStoreData(store.store)
   } catch (error) {
     if (existsSync(configFile)) {
       copyFileSync(configFile, `${configFile}.broken-${Date.now()}.bak`)
@@ -134,6 +141,12 @@ function backfillExpectedProcessNames(): void {
 
 export function getStore(): Store<StoreData> {
   return store
+}
+
+// Ersetzt die komplette Datei (z. B. beim Wiederherstellen einer Sicherung),
+// statt einzelne Schlüssel zusammenzuführen.
+export function replaceStoreData(data: StoreData): void {
+  store.store = data
 }
 
 // Schreibt nur, wenn das Ergebnis dem Schema entspricht — verhindert eine kaputte Datei.

@@ -3,6 +3,7 @@ import { spawn } from 'child_process'
 import { randomUUID } from 'crypto'
 import { basename, dirname, extname, join } from 'path'
 import { readdir, stat } from 'fs/promises'
+import { existsSync } from 'fs'
 import { getStore, setEntries, type Entry } from './store'
 import { ensureIconCached, removeCachedIcon } from './icons'
 import { startSession } from './playtime'
@@ -11,26 +12,16 @@ function deriveName(targetPath: string): string {
   return basename(targetPath, extname(targetPath))
 }
 
-async function addEntryViaDialog(window: BrowserWindow): Promise<Entry[]> {
-  const result = await dialog.showOpenDialog(window, {
-    title: 'Programm hinzufügen',
-    properties: ['openFile', 'multiSelections'],
-    filters: [
-      { name: 'Programme', extensions: ['exe', 'lnk'] },
-      { name: 'Alle Dateien', extensions: ['*'] }
-    ]
-  })
-
-  if (result.canceled || result.filePaths.length === 0) {
-    return getStore().get('entries')
-  }
-
+// Gemeinsame Basis für den Datei-Dialog und Drag & Drop — beide liefern am
+// Ende nur eine Liste von Dateipfaden, der Rest (Dubletten prüfen, Icon
+// laden, Eintrag anlegen) ist identisch.
+async function addEntriesFromPaths(paths: string[]): Promise<Entry[]> {
   const existing = getStore().get('entries')
   const existingPaths = new Set(existing.map((entry) => entry.path))
 
   const newEntries: Entry[] = []
-  for (const filePath of result.filePaths) {
-    if (existingPaths.has(filePath)) {
+  for (const filePath of paths) {
+    if (existingPaths.has(filePath) || !existsSync(filePath)) {
       continue
     }
     const iconHash = await ensureIconCached(filePath)
@@ -53,6 +44,23 @@ async function addEntryViaDialog(window: BrowserWindow): Promise<Entry[]> {
   return updated
 }
 
+async function addEntryViaDialog(window: BrowserWindow): Promise<Entry[]> {
+  const result = await dialog.showOpenDialog(window, {
+    title: 'Programm hinzufügen',
+    properties: ['openFile', 'multiSelections'],
+    filters: [
+      { name: 'Programme', extensions: ['exe', 'lnk'] },
+      { name: 'Alle Dateien', extensions: ['*'] }
+    ]
+  })
+
+  if (result.canceled || result.filePaths.length === 0) {
+    return getStore().get('entries')
+  }
+
+  return addEntriesFromPaths(result.filePaths)
+}
+
 function renameEntry(id: string, name: string): Entry[] {
   const trimmed = name.trim()
   if (!trimmed) {
@@ -69,7 +77,7 @@ function renameEntry(id: string, name: string): Entry[] {
   return updated
 }
 
-function toggleEntryTag(id: string, tagId: string): Entry[] {
+export function toggleEntryTag(id: string, tagId: string): Entry[] {
   const entries = getStore().get('entries')
   const index = entries.findIndex((entry) => entry.id === id)
   if (index === -1) {
@@ -90,7 +98,7 @@ function toggleEntryTag(id: string, tagId: string): Entry[] {
   return updated
 }
 
-function toggleFavorite(id: string): Entry[] {
+export function toggleFavorite(id: string): Entry[] {
   const entries = getStore().get('entries')
   const index = entries.findIndex((entry) => entry.id === id)
   if (index === -1) {
@@ -102,7 +110,7 @@ function toggleFavorite(id: string): Entry[] {
   return updated
 }
 
-async function removeEntry(id: string): Promise<Entry[]> {
+export async function removeEntry(id: string): Promise<Entry[]> {
   const entries = getStore().get('entries')
   const target = entries.find((entry) => entry.id === id)
   if (!target) {
@@ -122,7 +130,7 @@ async function removeEntry(id: string): Promise<Entry[]> {
 
 // Der Renderer schickt nur die id — der echte Pfad kommt ausschließlich aus dem
 // bereits validierten Datenbestand im Main-Prozess, nie direkt vom Renderer.
-async function launchEntry(id: string): Promise<void> {
+export async function launchEntry(id: string): Promise<void> {
   const entries = getStore().get('entries')
   const entry = entries.find((e) => e.id === id)
   if (!entry) {
@@ -184,6 +192,15 @@ async function getEntrySize(id: string): Promise<number | null> {
   }
 }
 
+export function showEntryInExplorer(id: string): void {
+  const entry = getStore()
+    .get('entries')
+    .find((e) => e.id === id)
+  if (entry) {
+    shell.showItemInFolder(entry.path)
+  }
+}
+
 export function registerEntryHandlers(getWindow: () => BrowserWindow | null): void {
   ipcMain.handle('entries:list', () => getStore().get('entries'))
 
@@ -208,4 +225,8 @@ export function registerEntryHandlers(getWindow: () => BrowserWindow | null): vo
   ipcMain.handle('entries:launch', (_event, id: string) => launchEntry(id))
 
   ipcMain.handle('entries:getSize', (_event, id: string) => getEntrySize(id))
+
+  ipcMain.handle('entries:addPaths', (_event, paths: string[]) => addEntriesFromPaths(paths))
+
+  ipcMain.on('entries:showInExplorer', (_event, id: string) => showEntryInExplorer(id))
 }

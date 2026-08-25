@@ -176,6 +176,17 @@ export function IconExpand(props: IconProps): ReactElement {
   )
 }
 
+export function IconMore(props: IconProps): ReactElement {
+  return base(
+    props,
+    <>
+      <circle cx="12" cy="5" r="1.2" fill="currentColor" stroke="none" />
+      <circle cx="12" cy="12" r="1.2" fill="currentColor" stroke="none" />
+      <circle cx="12" cy="19" r="1.2" fill="currentColor" stroke="none" />
+    </>
+  )
+}
+
 export function IconApps(props: IconProps): ReactElement {
   return base(
     props,

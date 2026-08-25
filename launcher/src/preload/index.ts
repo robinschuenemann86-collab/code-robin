@@ -18,6 +18,14 @@ const api = {
   getEntrySize: (id: string): Promise<number | null> => ipcRenderer.invoke('entries:getSize', id),
   toggleFavorite: (id: string): Promise<Entry[]> =>
     ipcRenderer.invoke('entries:toggleFavorite', id),
+  addEntriesFromPaths: (paths: string[]): Promise<Entry[]> =>
+    ipcRenderer.invoke('entries:addPaths', paths),
+  showEntryInExplorer: (id: string): void => ipcRenderer.send('entries:showInExplorer', id),
+  onEntriesChanged: (callback: (entries: Entry[]) => void): (() => void) => {
+    const listener = (_event: unknown, entries: Entry[]): void => callback(entries)
+    ipcRenderer.on('entries:changed', listener)
+    return () => ipcRenderer.removeListener('entries:changed', listener)
+  },
 
   listTags: (): Promise<Tag[]> => ipcRenderer.invoke('tags:list'),
   addTag: (name: string): Promise<Tag[]> => ipcRenderer.invoke('tags:add', name),
@@ -44,7 +52,10 @@ const api = {
     const listener = (_event: unknown, value: boolean): void => callback(value)
     ipcRenderer.on('window:fullscreenChanged', listener)
     return () => ipcRenderer.removeListener('window:fullscreenChanged', listener)
-  }
+  },
+
+  showEntryContextMenu: (id: string): void => ipcRenderer.send('contextMenu:showForEntry', id),
+  showAppMenu: (): void => ipcRenderer.send('appMenu:show')
 }
 
 if (process.contextIsolated) {

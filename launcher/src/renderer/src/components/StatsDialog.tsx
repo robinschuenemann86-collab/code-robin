@@ -22,8 +22,11 @@ export function StatsDialog({ entries, stats, onClose }: StatsDialogProps): Reac
     return stats
       .map((stat) => ({ stat, entry: entries.find((e) => e.id === stat.entryId) }))
       .filter((row): row is { stat: EntryStats; entry: Entry } => row.entry !== undefined)
+      .filter((row) => row.stat.totalPlayedMs > 0)
       .sort((a, b) => b.stat.totalPlayedMs - a.stat.totalPlayedMs)
   }, [entries, stats])
+
+  const maxPlayedMs = rows[0]?.stat.totalPlayedMs ?? 0
 
   return (
     <div className="fixed inset-0 z-10 flex items-center justify-center bg-black/70">
@@ -41,15 +44,26 @@ export function StatsDialog({ entries, stats, onClose }: StatsDialogProps): Reac
             <p className="text-sm">Noch keine erfasste Spielzeit</p>
           </div>
         ) : (
-          <div className="flex flex-col gap-1 overflow-y-auto">
-            {rows.map(({ stat, entry }) => (
-              <div key={entry.id} className="flex items-center gap-3 rounded-lg px-2 py-1.5">
-                <EntryIcon iconHash={entry.iconHash} className="h-8 w-8" />
-                <span className="flex-1 truncate text-sm">{entry.name}</span>
-                <span className="text-xs text-text-muted">
-                  {stat.lastPlayedAt && new Date(stat.lastPlayedAt).toLocaleDateString('de-DE')}
-                </span>
-                <span className="text-sm text-cyan">{formatDuration(stat.totalPlayedMs)}</span>
+          <div className="flex flex-col gap-2 overflow-y-auto">
+            {rows.map(({ stat, entry }, index) => (
+              <div key={entry.id} className="flex flex-col gap-1 rounded-lg px-2 py-1.5">
+                <div className="flex items-center gap-3">
+                  <span className="w-4 shrink-0 text-right text-xs text-text-muted">
+                    {index + 1}.
+                  </span>
+                  <EntryIcon iconHash={entry.iconHash} className="h-8 w-8" />
+                  <span className="flex-1 truncate text-sm">{entry.name}</span>
+                  <span className="text-xs text-text-muted">
+                    {stat.lastPlayedAt && new Date(stat.lastPlayedAt).toLocaleDateString('de-DE')}
+                  </span>
+                  <span className="text-sm text-cyan">{formatDuration(stat.totalPlayedMs)}</span>
+                </div>
+                <div className="ml-7 h-1 overflow-hidden rounded-full bg-panel">
+                  <div
+                    className="h-full rounded-full bg-cyan"
+                    style={{ width: `${(stat.totalPlayedMs / maxPlayedMs) * 100}%` }}
+                  />
+                </div>
               </div>
             ))}
           </div>

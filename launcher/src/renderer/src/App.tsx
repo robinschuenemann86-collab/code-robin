@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState, type ReactElement } from 'react'
-import type { Entry, EntryStats, Tag, ViewMode } from './types'
+import { useEffect, useMemo, useState, type DragEvent, type ReactElement } from 'react'
+import type { Entry, EntryStats, SortMode, Tag, ViewMode } from './types'
 import type { UpdaterStatus } from '../../main/updater'
 import { EntryIcon } from './components/EntryIcon'
 import { Sidebar } from './components/Sidebar'
@@ -10,6 +10,7 @@ import { BigPictureView } from './components/BigPictureView'
 import {
   IconClock,
   IconExpand,
+  IconMore,
   IconPlus,
   IconSearch,
   IconStar,
@@ -32,7 +33,9 @@ function App(): ReactElement {
   const [selectedTagId, setSelectedTagId] = useState<string | null>(null)
   const [favoritesOnly, setFavoritesOnly] = useState(false)
   const [viewMode, setViewMode] = useState<ViewMode>('grid')
+  const [sortMode, setSortMode] = useState<SortMode>('added')
   const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null)
+  const [draggingOver, setDraggingOver] = useState(false)
 
   useEffect(() => {
     Promise.all([window.api.listEntries(), window.api.listTags(), window.api.listStats()]).then(
@@ -53,6 +56,12 @@ function App(): ReactElement {
     return window.api.onFullscreenChanged(setBigPictureMode)
   }, [])
 
+  // Änderungen über das native Kontextmenü oder eine wiederhergestellte
+  // Sicherung kommen vom Main-Prozess, nicht als Antwort auf einen eigenen Aufruf.
+  useEffect(() => {
+    return window.api.onEntriesChanged(setEntries)
+  }, [])
+
   // Spielzeit läuft im Hintergrund weiter (Prozess-Polling im Main-Prozess),
   // daher hier frisch nachladen statt die Werte vom App-Start zu behalten.
   useEffect(() => {
@@ -63,7 +72,9 @@ function App(): ReactElement {
 
   const filteredEntries = useMemo(() => {
     const query = searchQuery.trim().toLowerCase()
-    return entries.filter((entry) => {
+    const statsByEntry = new Map(stats.map((s) => [s.entryId, s]))
+
+    const filtered = entries.filter((entry) => {
       if (favoritesOnly && !entry.favorite) return false
       if (selectedTagId === '' && entry.tags.length > 0) return false
       if (selectedTagId && selectedTagId !== '' && !entry.tags.includes(selectedTagId))
@@ -71,7 +82,26 @@ function App(): ReactElement {
       if (query && !entry.name.toLowerCase().includes(query)) return false
       return true
     })
-  }, [entries, searchQuery, selectedTagId, favoritesOnly])
+
+    return [...filtered].sort((a, b) => {
+      switch (sortMode) {
+        case 'name':
+          return a.name.localeCompare(b.name, 'de')
+        case 'recent':
+          return (
+            (statsByEntry.get(b.id)?.lastPlayedAt ?? 0) - (statsByEntry.get(a.id)?.lastPlayedAt ?? 0)
+          )
+        case 'playtime':
+          return (
+            (statsByEntry.get(b.id)?.totalPlayedMs ?? 0) -
+            (statsByEntry.get(a.id)?.totalPlayedMs ?? 0)
+          )
+        case 'added':
+        default:
+          return b.addedAt - a.addedAt
+      }
+    })
+  }, [entries, searchQuery, selectedTagId, favoritesOnly, sortMode, stats])
 
   const selectedEntry = entries.find((e) => e.id === selectedEntryId) ?? null
 
@@ -90,6 +120,19 @@ function App(): ReactElement {
   async function handleAdd(): Promise<void> {
     const updated = await window.api.addEntryViaDialog()
     setEntries(updated)
+  }
+
+  // Electron reichert File-Objekte aus Drag&Drop um einen echten Dateisystem-
+  // pfad an (`.path`) — Standard-Web-APIs kennen das nicht, ist aber die
+  // übliche Electron-Erweiterung dafür.
+  async function handleDrop(e: DragEvent): Promise<void> {
+    e.preventDefault()
+    setDraggingOver(false)
+    const paths = Array.from(e.dataTransfer.files)
+      .map((file) => file.path)
+      .filter((path) => /\.(exe|lnk)$/i.test(path))
+    if (paths.length === 0) return
+    setEntries(await window.api.addEntriesFromPaths(paths))
   }
 
   async function handleLaunch(entry: Entry): Promise<void> {
@@ -243,6 +286,13 @@ function App(): ReactElement {
           >
             <IconPlus />
           </button>
+          <button
+            onClick={() => window.api.showAppMenu()}
+            title="Weitere Optionen"
+            className="rounded-lg border border-border bg-panel p-2.5 text-text transition hover:border-cyan/50 hover:text-cyan"
+          >
+            <IconMore />
+          </button>
         </div>
       </header>
 
@@ -281,12 +331,24 @@ function App(): ReactElement {
           onViewModeChange={setViewMode}
           favoritesOnly={favoritesOnly}
           onFavoritesOnlyChange={setFavoritesOnly}
+          sortMode={sortMode}
+          onSortModeChange={setSortMode}
           onAddTag={handleAddTag}
           onRenameTag={handleRenameTag}
           onRemoveTag={handleRemoveTag}
         />
 
-        <main className="flex-1 overflow-y-auto p-8">
+        <main
+          onDragOver={(e) => {
+            e.preventDefault()
+            setDraggingOver(true)
+          }}
+          onDragLeave={() => setDraggingOver(false)}
+          onDrop={handleDrop}
+          className={`flex-1 overflow-y-auto p-8 transition ${
+            draggingOver ? 'bg-panel-active outline-dashed outline-2 outline-cyan/50 -outline-offset-4' : ''
+          }`}
+        >
           {recentlyPlayed.length > 0 && (
             <div className="mb-6">
               <h2 className="mb-3 text-sm font-medium text-text-muted">Zuletzt gespielt</h2>
@@ -340,6 +402,10 @@ function App(): ReactElement {
                   key={entry.id}
                   onClick={() => setSelectedEntryId(entry.id)}
                   onDoubleClick={() => handleLaunch(entry)}
+                  onContextMenu={() => {
+                    setSelectedEntryId(entry.id)
+                    window.api.showEntryContextMenu(entry.id)
+                  }}
                   className={`group relative flex cursor-pointer flex-col items-center gap-2 rounded-xl border p-4 text-center transition ${
                     selectedEntryId === entry.id
                       ? 'glow-cyan border-cyan/60 bg-panel-active'
@@ -382,6 +448,10 @@ function App(): ReactElement {
                   key={entry.id}
                   onClick={() => setSelectedEntryId(entry.id)}
                   onDoubleClick={() => handleLaunch(entry)}
+                  onContextMenu={() => {
+                    setSelectedEntryId(entry.id)
+                    window.api.showEntryContextMenu(entry.id)
+                  }}
                   className={`group flex cursor-pointer items-center gap-3 rounded-lg border px-3 py-2 transition ${
                     selectedEntryId === entry.id
                       ? 'glow-cyan border-cyan/60 bg-panel-active'

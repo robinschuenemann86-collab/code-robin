@@ -12,6 +12,9 @@ export interface LauncherApi {
   launchEntry: (id: string) => Promise<void>
   getEntrySize: (id: string) => Promise<number | null>
   toggleFavorite: (id: string) => Promise<Entry[]>
+  addEntriesFromPaths: (paths: string[]) => Promise<Entry[]>
+  showEntryInExplorer: (id: string) => void
+  onEntriesChanged: (callback: (entries: Entry[]) => void) => () => void
 
   listTags: () => Promise<Tag[]>
   addTag: (name: string) => Promise<Tag[]>
@@ -28,6 +31,9 @@ export interface LauncherApi {
 
   setFullscreen: (value: boolean) => Promise<void>
   onFullscreenChanged: (callback: (value: boolean) => void) => () => void
+
+  showEntryContextMenu: (id: string) => void
+  showAppMenu: () => void
 }
 
 declare global {

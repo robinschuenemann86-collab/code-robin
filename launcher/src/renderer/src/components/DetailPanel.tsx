@@ -135,7 +135,13 @@ export function DetailPanel({
       </div>
 
       <div className="flex items-start gap-2">
-        <IconFolder className="mt-0.5 h-4 w-4 shrink-0 text-text-muted" />
+        <button
+          onClick={() => window.api.showEntryInExplorer(entry.id)}
+          title="Im Explorer anzeigen"
+          className="mt-0.5 shrink-0 text-text-muted hover:text-cyan"
+        >
+          <IconFolder className="h-4 w-4" />
+        </button>
         <span
           className="break-all rounded-lg border border-border bg-panel p-2 font-mono text-xs text-text"
           title={entry.path}
