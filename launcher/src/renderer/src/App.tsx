@@ -530,7 +530,7 @@ function App(): ReactElement {
                       handleToggleFavorite(entry)
                     }}
                     title="Favorit"
-                    className={`absolute left-2 top-2 p-1 ${
+                    className={`absolute left-2 top-2 z-10 p-1 ${
                       entry.favorite
                         ? 'block text-amber'
                         : 'hidden text-text-muted hover:text-amber group-hover:block group-focus-within:block'
@@ -544,7 +544,7 @@ function App(): ReactElement {
                       handleDelete(entry)
                     }}
                     title="Entfernen"
-                    className="absolute right-2 top-2 hidden rounded-md bg-panel-hover p-1 hover:bg-panel-active group-hover:block group-focus-within:block"
+                    className="absolute right-2 top-2 z-10 hidden rounded-md bg-panel-hover p-1 hover:bg-panel-active group-hover:block group-focus-within:block"
                   >
                     <IconTrash className="h-3.5 w-3.5" />
                   </button>
