@@ -75,8 +75,9 @@ export async function fetchCoverArt(entryId: string): Promise<Entry[]> {
     throw new Error('Kein SteamGridDB-Key hinterlegt. Über "…" → "SteamGridDB-Key…" eintragen.')
   }
 
-  const entries = getStore().get('entries')
-  const entry = entries.find((e) => e.id === entryId)
+  const entry = getStore()
+    .get('entries')
+    .find((e) => e.id === entryId)
   if (!entry) {
     throw new Error('Eintrag wurde nicht gefunden.')
   }
@@ -91,8 +92,14 @@ export async function fetchCoverArt(entryId: string): Promise<Entry[]> {
   }
 
   const newHash = await downloadAndCache(entryId, gridUrl)
-  const oldHash = entry.coverHash
-  const updated = entries.map((e) => (e.id === entryId ? { ...e, coverHash: newHash } : e))
+
+  // Erst jetzt, nach den langsamen Netzwerk-Aufrufen, den aktuellsten Stand
+  // lesen und schreiben — sonst überschreiben sich mehrere gleichzeitig
+  // angestoßene Abrufe gegenseitig (wer zuletzt fertig ist, gewinnt und
+  // verwirft die Treffer aller anderen, obwohl die erfolgreich waren).
+  const latest = getStore().get('entries')
+  const oldHash = latest.find((e) => e.id === entryId)?.coverHash ?? null
+  const updated = latest.map((e) => (e.id === entryId ? { ...e, coverHash: newHash } : e))
   setEntries(updated)
 
   const oldHashStillUsed = oldHash !== null && updated.some((e) => e.coverHash === oldHash)
