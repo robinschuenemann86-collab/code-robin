@@ -108,6 +108,17 @@ function computeOverview(): OverviewData {
   }
 }
 
+// Für den globalen Hotkey zum Sofort-Start — greift auf dieselbe
+// Session-Auswertung wie die "Zuletzt gespielt"-Sortierung im Renderer zu,
+// nur eben aus dem Main-Prozess heraus.
+export function getMostRecentlyPlayedEntryId(): string | null {
+  const withLastPlayed = computeStats().filter(
+    (s): s is EntryStats & { lastPlayedAt: number } => s.lastPlayedAt !== null
+  )
+  if (withLastPlayed.length === 0) return null
+  return withLastPlayed.reduce((a, b) => (b.lastPlayedAt > a.lastPlayedAt ? b : a)).entryId
+}
+
 export function registerStatsHandlers(): void {
   ipcMain.handle('stats:list', () => computeStats())
   ipcMain.handle('stats:overview', () => computeOverview())

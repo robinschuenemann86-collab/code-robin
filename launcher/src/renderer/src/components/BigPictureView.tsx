@@ -116,13 +116,17 @@ export function BigPictureView({ entries, onLaunch, onExit }: BigPictureViewProp
                 setSelectedIndex(index)
                 onLaunch(entry)
               }}
-              className={`flex flex-col items-center gap-3 rounded-2xl border p-6 text-center transition ${
+              className={`flex flex-col items-center gap-3 rounded-2xl border p-4 text-center transition ${
                 index === selectedIndex
                   ? 'glow-gold scale-105 border-gold/60 bg-panel-active'
                   : 'border-border bg-panel'
               }`}
             >
-              <EntryIcon iconHash={entry.iconHash} className="h-16 w-16" />
+              <EntryIcon
+                iconHash={entry.iconHash}
+                coverHash={entry.coverHash}
+                className="aspect-[2/3] w-full"
+              />
               <span className="w-full truncate text-sm font-medium">{entry.name}</span>
             </button>
           ))}
