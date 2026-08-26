@@ -76,6 +76,12 @@ function App(): ReactElement {
     return window.api.onOpenCoverArtKeyDialog(() => setCoverArtKeyDialogOpen(true))
   }, [])
 
+  // Rückmeldungen aus dem nativen Rechtsklick-Menü (z. B. Cover-Art-Suche) —
+  // die haben von dort aus keinen anderen Weg in die Statuszeile.
+  useEffect(() => {
+    return window.api.onStatusMessage(setStatus)
+  }, [])
+
   // Änderungen über das native Kontextmenü oder eine wiederhergestellte
   // Sicherung kommen vom Main-Prozess, nicht als Antwort auf einen eigenen Aufruf.
   useEffect(() => {

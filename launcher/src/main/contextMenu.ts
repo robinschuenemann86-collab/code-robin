@@ -45,13 +45,15 @@ export function registerContextMenuHandlers(getWindow: () => BrowserWindow | nul
       {
         label: 'Cover-Art laden',
         click: async () => {
+          window.webContents.send('status:message', `Suche Cover-Art für "${entry.name}" …`)
           try {
             notify(await fetchCoverArt(id))
+            window.webContents.send('status:message', `Cover-Art für "${entry.name}" geladen.`)
           } catch (error) {
-            dialog.showMessageBox(window, {
-              type: 'info',
-              message: error instanceof Error ? error.message : String(error)
-            })
+            window.webContents.send(
+              'status:message',
+              error instanceof Error ? error.message : String(error)
+            )
           }
         }
       },

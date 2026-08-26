@@ -82,16 +82,40 @@ export async function fetchCoverArt(entryId: string): Promise<Entry[]> {
     throw new Error('Eintrag wurde nicht gefunden.')
   }
 
-  const gameId = await searchGameId(entry.name, apiKey)
+  // fetch() wirft bei einem reinen Netzwerkproblem (kein DNS, Firewall,
+  // Timeout) eine technische "fetch failed"-Meldung ohne HTTP-Status — hier
+  // in eine verständliche Meldung übersetzen, statt sie roh durchzureichen.
+  let gameId: number | null
+  let gridUrl: string | null
+  try {
+    gameId = await searchGameId(entry.name, apiKey)
+  } catch (error) {
+    throw new Error(
+      `Verbindung zu SteamGridDB fehlgeschlagen (${error instanceof Error ? error.message : String(error)}).`
+    )
+  }
   if (!gameId) {
     throw new Error(`Kein SteamGridDB-Eintrag für "${entry.name}" gefunden.`)
   }
-  const gridUrl = await fetchGridUrl(gameId, apiKey)
+  try {
+    gridUrl = await fetchGridUrl(gameId, apiKey)
+  } catch (error) {
+    throw new Error(
+      `Verbindung zu SteamGridDB fehlgeschlagen (${error instanceof Error ? error.message : String(error)}).`
+    )
+  }
   if (!gridUrl) {
     throw new Error(`Für "${entry.name}" gibt es dort kein Cover-Bild.`)
   }
 
-  const newHash = await downloadAndCache(entryId, gridUrl)
+  let newHash: string
+  try {
+    newHash = await downloadAndCache(entryId, gridUrl)
+  } catch (error) {
+    throw new Error(
+      `Cover-Bild konnte nicht geladen werden (${error instanceof Error ? error.message : String(error)}).`
+    )
+  }
 
   // Erst jetzt, nach den langsamen Netzwerk-Aufrufen, den aktuellsten Stand
   // lesen und schreiben — sonst überschreiben sich mehrere gleichzeitig

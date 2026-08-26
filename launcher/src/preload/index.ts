@@ -69,6 +69,12 @@ const api = {
     const listener = (): void => callback()
     ipcRenderer.on('coverArt:openKeyDialog', listener)
     return () => ipcRenderer.removeListener('coverArt:openKeyDialog', listener)
+  },
+
+  onStatusMessage: (callback: (message: string) => void): (() => void) => {
+    const listener = (_event: unknown, message: string): void => callback(message)
+    ipcRenderer.on('status:message', listener)
+    return () => ipcRenderer.removeListener('status:message', listener)
   }
 }
 

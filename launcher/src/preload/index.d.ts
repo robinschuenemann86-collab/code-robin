@@ -43,6 +43,8 @@ export interface LauncherApi {
   setCoverArtKey: (key: string) => Promise<void>
   fetchCoverArt: (id: string) => Promise<Entry[]>
   onOpenCoverArtKeyDialog: (callback: () => void) => () => void
+
+  onStatusMessage: (callback: (message: string) => void) => () => void
 }
 
 declare global {
