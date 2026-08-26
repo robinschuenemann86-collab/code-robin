@@ -229,6 +229,11 @@ function App(): ReactElement {
     setDraggedEntryId(null)
     setDragOverEntryId(null)
     if (id === targetId) return
+    // Eine per Drag & Drop verschobene Kachel landet an einer festen Position —
+    // das ergibt nur in der eigenen Reihenfolge einen Sinn, nicht während z. B.
+    // nach Name sortiert ist. Deshalb hier automatisch umschalten, statt den
+    // Nutzer vorher zwingend im Dropdown "Eigene Reihenfolge" wählen zu lassen.
+    setSortMode('custom')
     setEntries(await window.api.moveEntry(id, targetId, position))
   }
 
@@ -488,19 +493,19 @@ function App(): ReactElement {
               {filteredEntries.map((entry) => (
                 <div
                   key={entry.id}
-                  draggable={sortMode === 'custom'}
+                  draggable
                   onDragStart={() => setDraggedEntryId(entry.id)}
                   onDragEnd={() => {
                     setDraggedEntryId(null)
                     setDragOverEntryId(null)
                   }}
                   onDragOver={(e) => {
-                    if (sortMode !== 'custom' || !draggedEntryId) return
+                    if (!draggedEntryId) return
                     e.preventDefault()
                     setDragOverEntryId(entry.id)
                   }}
                   onDrop={(e) => {
-                    if (sortMode !== 'custom' || !draggedEntryId) return
+                    if (!draggedEntryId) return
                     e.preventDefault()
                     e.stopPropagation()
                     handleMoveEntry(draggedEntryId, entry.id, 'before')
@@ -572,19 +577,19 @@ function App(): ReactElement {
               {filteredEntries.map((entry) => (
                 <div
                   key={entry.id}
-                  draggable={sortMode === 'custom'}
+                  draggable
                   onDragStart={() => setDraggedEntryId(entry.id)}
                   onDragEnd={() => {
                     setDraggedEntryId(null)
                     setDragOverEntryId(null)
                   }}
                   onDragOver={(e) => {
-                    if (sortMode !== 'custom' || !draggedEntryId) return
+                    if (!draggedEntryId) return
                     e.preventDefault()
                     setDragOverEntryId(entry.id)
                   }}
                   onDrop={(e) => {
-                    if (sortMode !== 'custom' || !draggedEntryId) return
+                    if (!draggedEntryId) return
                     e.preventDefault()
                     e.stopPropagation()
                     handleMoveEntry(draggedEntryId, entry.id, 'before')
