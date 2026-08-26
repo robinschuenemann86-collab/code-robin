@@ -1,6 +1,7 @@
 import { ipcMain, Menu, dialog, shell, type BrowserWindow } from 'electron'
 import { getStore } from './store'
 import { launchEntry, toggleFavorite, toggleEntryTag, removeEntry, pickCustomIcon } from './entries'
+import { fetchCoverArt } from './coverArt'
 
 export function registerContextMenuHandlers(getWindow: () => BrowserWindow | null): void {
   ipcMain.on('contextMenu:showForEntry', (_event, id: string) => {
@@ -41,6 +42,19 @@ export function registerContextMenuHandlers(getWindow: () => BrowserWindow | nul
       { type: 'separator' },
       { label: 'Im Explorer anzeigen', click: () => shell.showItemInFolder(entry.path) },
       { label: 'Icon ändern…', click: () => pickCustomIcon(window, id).then(notify) },
+      {
+        label: 'Cover-Art laden',
+        click: async () => {
+          try {
+            notify(await fetchCoverArt(id))
+          } catch (error) {
+            dialog.showMessageBox(window, {
+              type: 'info',
+              message: error instanceof Error ? error.message : String(error)
+            })
+          }
+        }
+      },
       { type: 'separator' },
       {
         label: 'Entfernen',

@@ -38,6 +38,11 @@ export interface LauncherApi {
 
   showEntryContextMenu: (id: string) => void
   showAppMenu: () => void
+
+  getCoverArtKey: () => Promise<string | null>
+  setCoverArtKey: (key: string) => Promise<void>
+  fetchCoverArt: (id: string) => Promise<Entry[]>
+  onOpenCoverArtKeyDialog: (callback: () => void) => () => void
 }
 
 declare global {

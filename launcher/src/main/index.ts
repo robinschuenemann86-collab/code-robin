@@ -15,6 +15,7 @@ import { registerFullscreenHandlers, forwardFullscreenEvents } from './fullscree
 import { registerContextMenuHandlers } from './contextMenu'
 import { registerAppMenuHandlers } from './appMenu'
 import { loadWindowBounds, saveWindowBounds } from './windowBounds'
+import { registerCoverArtHandlers } from './coverArt'
 
 registerIconProtocolScheme()
 
@@ -108,6 +109,7 @@ app.whenReady().then(() => {
   registerFullscreenHandlers(() => mainWindow)
   registerContextMenuHandlers(() => mainWindow)
   registerAppMenuHandlers(() => mainWindow)
+  registerCoverArtHandlers()
 
   createWindow()
 

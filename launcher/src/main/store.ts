@@ -9,6 +9,9 @@ const EntrySchema = z.object({
   name: z.string().min(1),
   path: z.string().min(1),
   iconHash: z.string().nullable(),
+  // Große Boxart von SteamGridDB, unabhängig vom kleinen iconHash — siehe
+  // coverArt.ts. Nicht gesetzt, solange niemand sie geladen hat.
+  coverHash: z.string().nullable().default(null),
   tags: z.array(z.string()).default([]),
   addedAt: z.number(),
   // Nur gesetzt für per Scanner importierte Steam-Spiele. Diese werden über

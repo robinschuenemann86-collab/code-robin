@@ -7,6 +7,7 @@ import { DetailPanel } from './components/DetailPanel'
 import { ScannerDialog } from './components/ScannerDialog'
 import { StatsDialog } from './components/StatsDialog'
 import { OverviewDialog } from './components/OverviewDialog'
+import { CoverArtKeyDialog } from './components/CoverArtKeyDialog'
 import { BigPictureView } from './components/BigPictureView'
 import {
   IconAlertTriangle,
@@ -37,6 +38,7 @@ function App(): ReactElement {
   const [statsOpen, setStatsOpen] = useState(false)
   const [overviewOpen, setOverviewOpen] = useState(false)
   const [overview, setOverview] = useState<OverviewData | null>(null)
+  const [coverArtKeyDialogOpen, setCoverArtKeyDialogOpen] = useState(false)
   const [updaterStatus, setUpdaterStatus] = useState<UpdaterStatus | null>(null)
   const [bigPictureMode, setBigPictureMode] = useState(false)
 
@@ -68,6 +70,10 @@ function App(): ReactElement {
 
   useEffect(() => {
     return window.api.onFullscreenChanged(setBigPictureMode)
+  }, [])
+
+  useEffect(() => {
+    return window.api.onOpenCoverArtKeyDialog(() => setCoverArtKeyDialogOpen(true))
   }, [])
 
   // Änderungen über das native Kontextmenü oder eine wiederhergestellte
@@ -203,6 +209,14 @@ function App(): ReactElement {
 
   async function handleChangeIcon(id: string): Promise<void> {
     setEntries(await window.api.pickCustomIcon(id))
+  }
+
+  async function handleFetchCoverArt(id: string): Promise<void> {
+    try {
+      setEntries(await window.api.fetchCoverArt(id))
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : String(error))
+    }
   }
 
   async function handleMoveEntry(id: string, targetId: string, position: 'before' | 'after'): Promise<void> {
@@ -523,8 +537,12 @@ function App(): ReactElement {
                   >
                     <IconTrash className="h-3.5 w-3.5" />
                   </button>
-                  <div className="relative">
-                    <EntryIcon iconHash={entry.iconHash} />
+                  <div className="relative w-full">
+                    <EntryIcon
+                      iconHash={entry.iconHash}
+                      coverHash={entry.coverHash}
+                      className="aspect-[2/3] w-full"
+                    />
                     {isNewEntry(entry) && (
                       <span className="absolute -right-1 -top-1 rounded-full ember-grad-bg px-1.5 py-0.5 text-[9px] font-semibold leading-none text-on-ember">
                         NEU
@@ -643,6 +661,7 @@ function App(): ReactElement {
             onRename={handleRename}
             onToggleTag={handleToggleTag}
             onChangeIcon={handleChangeIcon}
+            onFetchCoverArt={handleFetchCoverArt}
             onToggleFavorite={handleToggleFavorite}
             onRemove={handleDelete}
             onClose={() => setSelectedEntryId(null)}
@@ -678,6 +697,10 @@ function App(): ReactElement {
           overview={overview}
           onClose={() => setOverviewOpen(false)}
         />
+      )}
+
+      {coverArtKeyDialogOpen && (
+        <CoverArtKeyDialog onClose={() => setCoverArtKeyDialogOpen(false)} />
       )}
     </div>
   )

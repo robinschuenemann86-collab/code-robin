@@ -21,6 +21,11 @@ export function registerAppMenuHandlers(getWindow: () => BrowserWindow | null): 
           const entries = await importBackup(window)
           if (entries) window.webContents.send('entries:changed', entries)
         }
+      },
+      { type: 'separator' },
+      {
+        label: 'SteamGridDB-Key…',
+        click: () => window.webContents.send('coverArt:openKeyDialog')
       }
     ])
     menu.popup({ window })

@@ -3,6 +3,7 @@ export interface Entry {
   name: string
   path: string
   iconHash: string | null
+  coverHash: string | null
   tags: string[]
   addedAt: number
   favorite: boolean

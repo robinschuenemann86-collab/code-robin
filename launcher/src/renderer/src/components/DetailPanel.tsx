@@ -30,6 +30,7 @@ interface DetailPanelProps {
   onRename: (id: string, name: string) => void
   onToggleTag: (id: string, tagId: string) => void
   onChangeIcon: (id: string) => void
+  onFetchCoverArt: (id: string) => void
   onToggleFavorite: (entry: Entry) => void
   onRemove: (entry: Entry) => void
   onClose: () => void
@@ -52,6 +53,7 @@ export function DetailPanel({
   onRename,
   onToggleTag,
   onChangeIcon,
+  onFetchCoverArt,
   onToggleFavorite,
   onRemove,
   onClose
@@ -99,10 +101,20 @@ export function DetailPanel({
           title="Icon ändern"
           className="group relative"
         >
-          <EntryIcon iconHash={entry.iconHash} className="h-20 w-20" />
+          <EntryIcon
+            iconHash={entry.iconHash}
+            coverHash={entry.coverHash}
+            className={entry.coverHash ? 'aspect-[2/3] w-32' : 'h-20 w-20'}
+          />
           <span className="absolute inset-0 hidden items-center justify-center rounded-xl bg-black/50 group-hover:flex">
             <IconEdit className="h-5 w-5 text-white" />
           </span>
+        </button>
+        <button
+          onClick={() => onFetchCoverArt(entry.id)}
+          className="text-xs font-semibold text-gold hover:brightness-125"
+        >
+          {entry.coverHash ? 'Cover-Art neu laden' : 'Cover-Art laden'}
         </button>
         {editingName ? (
           <input

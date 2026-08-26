@@ -60,7 +60,16 @@ const api = {
   },
 
   showEntryContextMenu: (id: string): void => ipcRenderer.send('contextMenu:showForEntry', id),
-  showAppMenu: (): void => ipcRenderer.send('appMenu:show')
+  showAppMenu: (): void => ipcRenderer.send('appMenu:show'),
+
+  getCoverArtKey: (): Promise<string | null> => ipcRenderer.invoke('coverArt:get'),
+  setCoverArtKey: (key: string): Promise<void> => ipcRenderer.invoke('coverArt:set', key),
+  fetchCoverArt: (id: string): Promise<Entry[]> => ipcRenderer.invoke('coverArt:fetch', id),
+  onOpenCoverArtKeyDialog: (callback: () => void): (() => void) => {
+    const listener = (): void => callback()
+    ipcRenderer.on('coverArt:openKeyDialog', listener)
+    return () => ipcRenderer.removeListener('coverArt:openKeyDialog', listener)
+  }
 }
 
 if (process.contextIsolated) {

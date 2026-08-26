@@ -31,6 +31,7 @@ async function addEntriesFromPaths(paths: string[]): Promise<Entry[]> {
       name: deriveName(filePath),
       path: filePath,
       iconHash,
+      coverHash: null,
       tags: [],
       addedAt: Date.now(),
       steamAppId: null,
@@ -153,6 +154,11 @@ export async function removeEntry(id: string): Promise<Entry[]> {
     target.iconHash !== null && remaining.some((entry) => entry.iconHash === target.iconHash)
   if (target.iconHash && !hashStillUsed) {
     await removeCachedIcon(target.iconHash)
+  }
+  const coverStillUsed =
+    target.coverHash !== null && remaining.some((entry) => entry.coverHash === target.coverHash)
+  if (target.coverHash && !coverStillUsed) {
+    await removeCachedIcon(target.coverHash)
   }
 
   setEntries(remaining)
