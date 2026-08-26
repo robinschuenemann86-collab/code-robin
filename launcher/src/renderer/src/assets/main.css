@@ -1,31 +1,46 @@
 @import 'tailwindcss';
 
 @theme {
-  --color-base: #0a0b10;
-  --color-panel: #12141d;
-  --color-panel-hover: #1a1d29;
-  --color-panel-active: #202544;
-  --color-border: #23273a;
-  --color-text: #eceef5;
-  --color-text-muted: #888ca3;
-  --color-cyan: #33e1ff;
-  --color-pink: #ff3f9e;
-  --color-violet: #a78bfa;
-  --color-amber: #fbbf6b;
+  --color-base: #14100c;
+  --color-panel: #1e1712;
+  --color-panel-hover: #281f18;
+  --color-panel-active: #33271b;
+  --color-border: #3a2c20;
+  --color-text: #f7efe6;
+  --color-text-muted: #b3a08d;
+  --color-ember: #ff5b1f;
+  --color-gold: #ffb020;
+  --color-amber: #ffd873;
+  --color-rust: #ff8a3d;
+  --color-danger: #ff4d4d;
+  --color-on-ember: #1a0f04;
+  --font-display: 'Bahnschrift', ui-sans-serif, system-ui, sans-serif;
 }
 
 body {
   margin: 0;
   overflow: hidden;
+  font-family: ui-sans-serif, system-ui, sans-serif;
 }
 
-.glow-cyan {
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-cyan) 60%, transparent), 0 0 16px
-    color-mix(in srgb, var(--color-cyan) 35%, transparent);
+.ember-grad-bg {
+  background: linear-gradient(135deg, var(--color-ember) 0%, var(--color-gold) 65%, var(--color-amber) 100%);
 }
 
-.glow-pink {
-  box-shadow: 0 0 16px color-mix(in srgb, var(--color-pink) 45%, transparent);
+.ember-grad-text {
+  background: linear-gradient(120deg, var(--color-ember) 0%, var(--color-gold) 55%, var(--color-amber) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.glow-gold {
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-gold) 60%, transparent), 0 0 16px
+    color-mix(in srgb, var(--color-gold) 35%, transparent);
+}
+
+.glow-ember {
+  box-shadow: 0 0 16px color-mix(in srgb, var(--color-ember) 45%, transparent);
 }
 
 .divider {
@@ -33,7 +48,7 @@ body {
   background: linear-gradient(
     90deg,
     transparent,
-    color-mix(in srgb, var(--color-cyan) 25%, var(--color-border)),
+    color-mix(in srgb, var(--color-gold) 25%, var(--color-border)),
     transparent
   );
 }

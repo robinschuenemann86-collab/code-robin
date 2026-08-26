@@ -22,7 +22,7 @@ interface SidebarProps {
 
 // Kleine, sich wiederholende Akzentfarben für die Tag-Punkte —
 // rein kosmetisch zur Wiedererkennung, keine feste Bedeutung pro Farbe.
-const DOT_COLORS = ['bg-cyan', 'bg-pink', 'bg-violet', 'bg-amber']
+const DOT_COLORS = ['bg-gold', 'bg-ember', 'bg-rust', 'bg-amber']
 
 export function Sidebar({
   tags,
@@ -70,7 +70,7 @@ export function Sidebar({
           value={searchQuery}
           onChange={(e) => onSearchChange(e.target.value)}
           placeholder="Suchen …"
-          className="w-full rounded-lg border border-border bg-panel py-1.5 pl-9 pr-3 text-sm text-text outline-none placeholder:text-text-muted focus:border-cyan/50"
+          className="w-full rounded-lg border border-border bg-panel py-1.5 pl-9 pr-3 text-sm text-text outline-none placeholder:text-text-muted focus:border-gold/50"
         />
       </div>
 
@@ -79,7 +79,7 @@ export function Sidebar({
           onClick={() => onViewModeChange('grid')}
           title="Raster"
           className={`flex-1 rounded-md py-1.5 flex items-center justify-center transition ${
-            viewMode === 'grid' ? 'bg-panel-active text-cyan' : 'text-text-muted hover:text-text'
+            viewMode === 'grid' ? 'bg-panel-active text-gold' : 'text-text-muted hover:text-text'
           }`}
         >
           <IconGrid className="h-4 w-4" />
@@ -88,7 +88,7 @@ export function Sidebar({
           onClick={() => onViewModeChange('list')}
           title="Liste"
           className={`flex-1 rounded-md py-1.5 flex items-center justify-center transition ${
-            viewMode === 'list' ? 'bg-panel-active text-cyan' : 'text-text-muted hover:text-text'
+            viewMode === 'list' ? 'bg-panel-active text-gold' : 'text-text-muted hover:text-text'
           }`}
         >
           <IconList className="h-4 w-4" />
@@ -107,15 +107,19 @@ export function Sidebar({
       <select
         value={sortMode}
         onChange={(e) => onSortModeChange(e.target.value as SortMode)}
-        className="rounded-lg border border-border bg-panel px-2 py-1.5 text-sm text-text outline-none focus:border-cyan/50"
+        className="rounded-lg border border-border bg-panel px-2 py-1.5 text-sm text-text outline-none focus:border-gold/50"
       >
         <option value="added">Zuletzt hinzugefügt</option>
         <option value="name">Name (A-Z)</option>
         <option value="recent">Zuletzt gespielt</option>
         <option value="playtime">Spielzeit</option>
+        <option value="custom">Eigene Reihenfolge</option>
       </select>
+      {sortMode === 'custom' && (
+        <p className="-mt-3 text-xs text-text-muted">Programme per Drag & Drop verschieben.</p>
+      )}
 
-      <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto">
+      <div className="flex flex-col gap-1">
         <button
           onClick={() => onSelectTag(null)}
           className={`rounded-lg px-2 py-1.5 text-left text-sm transition ${
@@ -136,22 +140,23 @@ export function Sidebar({
         >
           Unsortiert <span className="text-text-muted">({untaggedCount})</span>
         </button>
+      </div>
 
-        {tags.map((tag, index) => {
-          const count = entries.filter((e) => e.tags.includes(tag.id)).length
-          const isEditing = editingTagId === tag.id
-          const dotColor = DOT_COLORS[index % DOT_COLORS.length]
-          return (
-            <div
-              key={tag.id}
-              className={`group flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm transition ${
-                selectedTagId === tag.id
-                  ? 'bg-panel-active text-text'
-                  : 'text-text-muted hover:bg-panel-hover hover:text-text'
-              }`}
-            >
-              {isEditing ? (
+      <div className="flex flex-1 flex-col gap-3 overflow-y-auto">
+        <span className="font-display text-[11px] font-bold tracking-wider text-text-muted">
+          DEINE TAGS
+        </span>
+        <div className="flex flex-wrap gap-2">
+          {tags.map((tag, index) => {
+            const count = entries.filter((e) => e.tags.includes(tag.id)).length
+            const isEditing = editingTagId === tag.id
+            const color = DOT_COLORS[index % DOT_COLORS.length]
+            const active = selectedTagId === tag.id
+
+            if (isEditing) {
+              return (
                 <input
+                  key={tag.id}
                   autoFocus
                   value={editingTagName}
                   onChange={(e) => setEditingTagName(e.target.value)}
@@ -160,61 +165,67 @@ export function Sidebar({
                     if (e.key === 'Enter') commitRename()
                     if (e.key === 'Escape') setEditingTagId(null)
                   }}
-                  className="w-full rounded bg-panel-hover px-1 text-sm text-text outline-none"
+                  className="w-28 rounded-full bg-panel-hover px-3 py-1.5 text-xs text-text outline-none"
                 />
-              ) : (
-                <>
-                  <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${dotColor}`} />
-                  <button onClick={() => onSelectTag(tag.id)} className="flex-1 truncate text-left">
-                    {tag.name} <span className="text-text-muted">({count})</span>
-                  </button>
-                  <button
-                    onClick={() => {
-                      setEditingTagId(tag.id)
-                      setEditingTagName(tag.name)
-                    }}
-                    title="Umbenennen"
-                    className="hidden p-0.5 text-text-muted hover:text-cyan group-hover:inline-flex group-focus-within:inline-flex"
-                  >
-                    <IconEdit className="h-3.5 w-3.5" />
-                  </button>
-                  <button
-                    onClick={() => onRemoveTag(tag.id)}
-                    title="Löschen"
-                    className="hidden p-0.5 text-text-muted hover:text-pink group-hover:inline-flex group-focus-within:inline-flex"
-                  >
-                    <IconTrash className="h-3.5 w-3.5" />
-                  </button>
-                </>
-              )}
-            </div>
-          )
-        })}
-      </nav>
+              )
+            }
 
-      {addingTag ? (
-        <input
-          autoFocus
-          value={newTagName}
-          onChange={(e) => setNewTagName(e.target.value)}
-          onBlur={commitNewTag}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') commitNewTag()
-            if (e.key === 'Escape') setAddingTag(false)
-          }}
-          placeholder="Neuer Tag"
-          className="rounded-lg border border-border bg-panel px-2 py-1 text-sm text-text outline-none focus:border-cyan/50"
-        />
-      ) : (
-        <button
-          onClick={() => setAddingTag(true)}
-          title="Tag hinzufügen"
-          className="flex items-center gap-1.5 rounded-lg px-2 py-1 text-sm text-text-muted transition hover:bg-panel-hover hover:text-cyan"
-        >
-          <IconPlus className="h-3.5 w-3.5" />
-          Tag
-        </button>
-      )}
+            return (
+              <div
+                key={tag.id}
+                className={`group flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-bold text-on-ember transition ${color} ${
+                  active ? 'ring-2 ring-text/60' : 'opacity-90 hover:opacity-100'
+                }`}
+              >
+                <button onClick={() => onSelectTag(tag.id)} className="truncate">
+                  {tag.name} <span className="opacity-70">({count})</span>
+                </button>
+                <button
+                  onClick={() => {
+                    setEditingTagId(tag.id)
+                    setEditingTagName(tag.name)
+                  }}
+                  title="Umbenennen"
+                  className="hidden p-0.5 group-hover:inline-flex group-focus-within:inline-flex"
+                >
+                  <IconEdit className="h-3 w-3" />
+                </button>
+                <button
+                  onClick={() => onRemoveTag(tag.id)}
+                  title="Löschen"
+                  className="hidden p-0.5 group-hover:inline-flex group-focus-within:inline-flex"
+                >
+                  <IconTrash className="h-3 w-3" />
+                </button>
+              </div>
+            )
+          })}
+
+          {addingTag ? (
+            <input
+              autoFocus
+              value={newTagName}
+              onChange={(e) => setNewTagName(e.target.value)}
+              onBlur={commitNewTag}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') commitNewTag()
+                if (e.key === 'Escape') setAddingTag(false)
+              }}
+              placeholder="Neuer Tag"
+              className="w-28 rounded-full border border-border bg-panel px-3 py-1.5 text-xs text-text outline-none focus:border-gold/50"
+            />
+          ) : (
+            <button
+              onClick={() => setAddingTag(true)}
+              title="Tag hinzufügen"
+              className="flex items-center gap-1 rounded-full border border-dashed border-border px-3 py-1.5 text-xs font-semibold text-text-muted transition hover:border-gold/50 hover:text-gold"
+            >
+              <IconPlus className="h-3 w-3" />
+              Tag
+            </button>
+          )}
+        </div>
+      </div>
     </aside>
   )
 }

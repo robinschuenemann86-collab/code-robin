@@ -29,6 +29,10 @@ export function ScannerDialog({ onClose, onImported }: ScannerDialogProps): Reac
     [candidates]
   )
   const epicCandidates = useMemo(() => candidates.filter((c) => c.source === 'epic'), [candidates])
+  const battlenetCandidates = useMemo(
+    () => candidates.filter((c) => c.source === 'battlenet'),
+    [candidates]
+  )
   const registryCandidates = useMemo(
     () => candidates.filter((c) => c.source === 'registry'),
     [candidates]
@@ -68,7 +72,7 @@ export function ScannerDialog({ onClose, onImported }: ScannerDialogProps): Reac
               disabled={candidate.alreadyImported}
               checked={selectedKeys.has(candidate.key)}
               onChange={() => toggle(candidate.key)}
-              className="accent-cyan"
+              className="accent-gold"
             />
             <EntryIcon iconHash={candidate.iconHash} className="h-8 w-8" />
             <span className="flex-1 truncate text-sm">{candidate.name}</span>
@@ -92,7 +96,7 @@ export function ScannerDialog({ onClose, onImported }: ScannerDialogProps): Reac
       <div className="flex max-h-[80vh] w-[32rem] flex-col gap-4 rounded-xl border border-border bg-base p-6 shadow-2xl">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold">Programme suchen</h2>
-          <button onClick={onClose} className="text-text-muted hover:text-cyan" title="Schließen">
+          <button onClick={onClose} className="text-text-muted hover:text-gold" title="Schließen">
             <IconX className="h-4 w-4" />
           </button>
         </div>
@@ -105,6 +109,7 @@ export function ScannerDialog({ onClose, onImported }: ScannerDialogProps): Reac
           <div className="flex flex-col gap-4 overflow-y-auto">
             {renderGroup('Steam-Spiele', steamCandidates)}
             {renderGroup('Epic-Spiele', epicCandidates)}
+            {renderGroup('Battle.net-Spiele', battlenetCandidates)}
             {renderGroup('Installierte Programme', registryCandidates)}
           </div>
         )}
@@ -114,7 +119,7 @@ export function ScannerDialog({ onClose, onImported }: ScannerDialogProps): Reac
             onClick={handleImport}
             disabled={loading || importing || selectedKeys.size === 0}
             title="Importieren"
-            className="glow-pink flex items-center gap-2 rounded-lg bg-pink px-4 py-2 text-sm font-medium text-white transition hover:brightness-110 disabled:opacity-40 disabled:shadow-none"
+            className="glow-ember ember-grad-bg flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-on-ember transition hover:brightness-110 disabled:opacity-40 disabled:shadow-none"
           >
             <IconDownload className="h-4 w-4" />
             {importing ? '…' : selectedKeys.size}

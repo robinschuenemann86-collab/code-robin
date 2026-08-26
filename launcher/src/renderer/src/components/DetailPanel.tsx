@@ -81,7 +81,7 @@ export function DetailPanel({
         >
           <IconStar className="h-4 w-4" filled={entry.favorite} />
         </button>
-        <button onClick={onClose} className="text-text-muted hover:text-cyan" title="Schließen">
+        <button onClick={onClose} className="text-text-muted hover:text-gold" title="Schließen">
           <IconX className="h-4 w-4" />
         </button>
       </div>
@@ -143,8 +143,8 @@ export function DetailPanel({
                   onClick={() => onToggleTag(entry.id, tag.id)}
                   className={`rounded-full border px-2 py-0.5 text-xs transition ${
                     active
-                      ? 'border-cyan/60 bg-panel-active text-cyan'
-                      : 'border-border text-text-muted hover:border-cyan/30 hover:text-text'
+                      ? 'border-gold/60 bg-panel-active text-gold'
+                      : 'border-border text-text-muted hover:border-gold/30 hover:text-text'
                   }`}
                 >
                   {tag.name}
@@ -159,7 +159,7 @@ export function DetailPanel({
         <button
           onClick={() => window.api.showEntryInExplorer(entry.id)}
           title="Im Explorer anzeigen"
-          className="mt-0.5 shrink-0 text-text-muted hover:text-cyan"
+          className="mt-0.5 shrink-0 text-text-muted hover:text-gold"
         >
           <IconFolder className="h-4 w-4" />
         </button>
@@ -194,14 +194,14 @@ export function DetailPanel({
         <button
           onClick={() => onLaunch(entry)}
           title="Starten"
-          className="glow-cyan flex flex-1 items-center justify-center rounded-lg bg-cyan py-2.5 text-base transition hover:brightness-110"
+          className="glow-gold flex flex-1 items-center justify-center rounded-lg bg-gold py-2.5 text-base transition hover:brightness-110"
         >
           <IconPlay className="h-5 w-5" />
         </button>
         <button
           onClick={() => onRemove(entry)}
           title="Entfernen"
-          className="flex items-center justify-center rounded-lg border border-border px-4 text-text-muted transition hover:border-pink/50 hover:text-pink"
+          className="flex items-center justify-center rounded-lg border border-border px-4 text-text-muted transition hover:border-danger/50 hover:text-danger"
         >
           <IconTrash className="h-4 w-4" />
         </button>

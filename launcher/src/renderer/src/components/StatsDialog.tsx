@@ -33,7 +33,7 @@ export function StatsDialog({ entries, stats, onClose }: StatsDialogProps): Reac
       <div className="flex max-h-[80vh] w-[28rem] flex-col gap-4 rounded-xl border border-border bg-base p-6 shadow-2xl">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold">Statistik</h2>
-          <button onClick={onClose} className="text-text-muted hover:text-cyan" title="Schließen">
+          <button onClick={onClose} className="text-text-muted hover:text-gold" title="Schließen">
             <IconX className="h-4 w-4" />
           </button>
         </div>
@@ -57,11 +57,11 @@ export function StatsDialog({ entries, stats, onClose }: StatsDialogProps): Reac
                     {stat.launchCount}× ·{' '}
                     {stat.lastPlayedAt && new Date(stat.lastPlayedAt).toLocaleDateString('de-DE')}
                   </span>
-                  <span className="text-sm text-cyan">{formatDuration(stat.totalPlayedMs)}</span>
+                  <span className="text-sm text-gold">{formatDuration(stat.totalPlayedMs)}</span>
                 </div>
                 <div className="ml-7 h-1 overflow-hidden rounded-full bg-panel">
                   <div
-                    className="h-full rounded-full bg-cyan"
+                    className="h-full rounded-full bg-gold"
                     style={{ width: `${(stat.totalPlayedMs / maxPlayedMs) * 100}%` }}
                   />
                 </div>

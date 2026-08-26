@@ -1,7 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type { Entry, Tag } from '../main/store'
 import type { Candidate } from '../main/scanner'
-import type { EntryStats } from '../main/stats'
+import type { EntryStats, OverviewData } from '../main/stats'
 import type { UpdaterStatus } from '../main/updater'
 
 // Jede Funktion hier entspricht genau einem erlaubten IPC-Kanal.
@@ -14,6 +14,8 @@ const api = {
   toggleEntryTag: (id: string, tagId: string): Promise<Entry[]> =>
     ipcRenderer.invoke('entries:toggleTag', id, tagId),
   removeEntry: (id: string): Promise<Entry[]> => ipcRenderer.invoke('entries:remove', id),
+  moveEntry: (id: string, targetId: string | null, position: 'before' | 'after'): Promise<Entry[]> =>
+    ipcRenderer.invoke('entries:move', id, targetId, position),
   launchEntry: (id: string): Promise<void> => ipcRenderer.invoke('entries:launch', id),
   getEntrySize: (id: string): Promise<number | null> => ipcRenderer.invoke('entries:getSize', id),
   toggleFavorite: (id: string): Promise<Entry[]> =>
@@ -40,6 +42,7 @@ const api = {
     ipcRenderer.invoke('scanner:import', candidates),
 
   listStats: (): Promise<EntryStats[]> => ipcRenderer.invoke('stats:list'),
+  getOverview: (): Promise<OverviewData> => ipcRenderer.invoke('stats:overview'),
 
   onUpdaterStatus: (callback: (status: UpdaterStatus) => void): (() => void) => {
     const listener = (_event: unknown, status: UpdaterStatus): void => callback(status)

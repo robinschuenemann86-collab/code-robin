@@ -6,6 +6,7 @@ export interface Entry {
   tags: string[]
   addedAt: number
   favorite: boolean
+  order: number
 }
 
 export interface Tag {
@@ -15,15 +16,16 @@ export interface Tag {
 
 export type ViewMode = 'grid' | 'list'
 
-export type SortMode = 'name' | 'recent' | 'playtime' | 'added'
+export type SortMode = 'name' | 'recent' | 'playtime' | 'added' | 'custom'
 
 export interface Candidate {
   key: string
   name: string
-  source: 'registry' | 'steam' | 'epic'
+  source: 'registry' | 'steam' | 'epic' | 'battlenet'
   path: string
   steamAppId: string | null
   epicAppName: string | null
+  battlenetCode: string | null
   expectedProcessName: string | null
   iconHash: string | null
   alreadyImported: boolean
@@ -35,4 +37,12 @@ export interface EntryStats {
   totalPlayedMs: number
   lastPlayedAt: number | null
   launchCount: number
+}
+
+export interface OverviewData {
+  streakDays: number
+  weekActivity: (boolean | null)[]
+  playedThisWeekMs: number
+  totalLaunches: number
+  recentSessions: { entryId: string; endedAt: number; durationMs: number }[]
 }

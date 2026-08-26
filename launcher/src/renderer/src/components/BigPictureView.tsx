@@ -87,10 +87,18 @@ export function BigPictureView({ entries, onLaunch, onExit }: BigPictureViewProp
   }, [entries, selectedIndex])
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-base p-10 text-text">
+    <div
+      className="fixed inset-0 z-50 flex flex-col p-10 text-text"
+      style={{
+        background:
+          'radial-gradient(120% 90% at 50% 0%, color-mix(in srgb, var(--color-ember) 20%, var(--color-base)) 0%, color-mix(in srgb, var(--color-ember) 6%, var(--color-base)) 45%, var(--color-base) 100%)'
+      }}
+    >
       <div className="mb-8 flex items-center gap-3">
         <img src={logo} alt="" className="h-10 w-10 rounded-md object-cover" />
-        <h1 className="text-xl font-semibold tracking-tight">MR Launch</h1>
+        <h1 className="ember-grad-text font-display text-xl font-extrabold uppercase tracking-tight">
+          MR Launch
+        </h1>
         <p className="ml-auto text-sm text-text-muted">Esc zum Beenden · Enter zum Starten</p>
       </div>
 
@@ -110,7 +118,7 @@ export function BigPictureView({ entries, onLaunch, onExit }: BigPictureViewProp
               }}
               className={`flex flex-col items-center gap-3 rounded-2xl border p-6 text-center transition ${
                 index === selectedIndex
-                  ? 'glow-cyan scale-105 border-cyan/60 bg-panel-active'
+                  ? 'glow-gold scale-105 border-gold/60 bg-panel-active'
                   : 'border-border bg-panel'
               }`}
             >

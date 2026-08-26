@@ -16,10 +16,17 @@ const EntrySchema = z.object({
   steamAppId: z.string().nullable().default(null),
   // Analog für Epic-Games-Titel: com.epicgames.launcher://apps/<id>?action=launch
   epicAppName: z.string().nullable().default(null),
+  // Analog für Battle.net-Titel: battlenet://<code>. Der Code kommt direkt aus
+  // Battle.net.config, nicht aus einer selbst gepflegten Zuordnungstabelle.
+  battlenetCode: z.string().nullable().default(null),
   favorite: z.boolean().default(false),
   // Prozessname (z. B. "Game.exe"), auf den beim Spielzeit-Tracking gepollt wird.
   // Ohne diesen Wert kann keine Spielzeit erfasst werden (siehe playtime.ts).
-  expectedProcessName: z.string().nullable().default(null)
+  expectedProcessName: z.string().nullable().default(null),
+  // Position für die manuelle Sortierung per Drag & Drop (siehe entries.ts
+  // moveEntry). 0 bedeutet "noch nie zugewiesen" und wird beim ersten Start
+  // nachträglich anhand von addedAt vergeben (siehe backfillOrder).
+  order: z.number().default(0)
 })
 
 const TagSchema = z.object({
@@ -116,6 +123,7 @@ export function initStore(): Store<StoreData> {
   }
 
   backfillExpectedProcessNames()
+  backfillOrder()
 
   return store
 }
@@ -139,8 +147,28 @@ function backfillExpectedProcessNames(): void {
   )
 }
 
+// Einträge aus Ständen vor der manuellen Sortierung kennen `order` noch
+// nicht (Default 0). Reiht sie anhand von addedAt auf, statt sie alle auf
+// dieselbe Position zu setzen.
+function backfillOrder(): void {
+  const entries = store.get('entries')
+  const needsBackfill = entries.some((e) => e.order === 0)
+  if (!needsBackfill) return
+
+  const byAddedAt = [...entries].sort((a, b) => a.addedAt - b.addedAt)
+  const orderById = new Map(byAddedAt.map((e, index) => [e.id, (index + 1) * 1000]))
+
+  setEntries(entries.map((e) => ({ ...e, order: orderById.get(e.id) ?? e.order })))
+}
+
 export function getStore(): Store<StoreData> {
   return store
+}
+
+// Liefert eine Order-Position, die garantiert hinter allen bestehenden liegt —
+// zum Anhängen neu erstellter Einträge ans Ende der manuellen Sortierung.
+export function nextOrder(entries: Entry[]): number {
+  return entries.reduce((max, e) => Math.max(max, e.order), 0) + 1000
 }
 
 // Ersetzt die komplette Datei (z. B. beim Wiederherstellen einer Sicherung),

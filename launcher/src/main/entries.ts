@@ -4,7 +4,7 @@ import { randomUUID } from 'crypto'
 import { basename, dirname, extname, join } from 'path'
 import { readdir, stat } from 'fs/promises'
 import { existsSync } from 'fs'
-import { getStore, setEntries, type Entry } from './store'
+import { getStore, setEntries, nextOrder, type Entry } from './store'
 import { ensureIconCached, removeCachedIcon, setCustomIcon } from './icons'
 import { startSession } from './playtime'
 
@@ -20,6 +20,7 @@ async function addEntriesFromPaths(paths: string[]): Promise<Entry[]> {
   const existingPaths = new Set(existing.map((entry) => entry.path))
 
   const newEntries: Entry[] = []
+  let order = nextOrder(existing) - 1000
   for (const filePath of paths) {
     if (existingPaths.has(filePath) || !existsSync(filePath)) {
       continue
@@ -34,8 +35,10 @@ async function addEntriesFromPaths(paths: string[]): Promise<Entry[]> {
       addedAt: Date.now(),
       steamAppId: null,
       epicAppName: null,
+      battlenetCode: null,
       favorite: false,
-      expectedProcessName: basename(filePath)
+      expectedProcessName: basename(filePath),
+      order: (order += 1000)
     })
   }
 
@@ -98,6 +101,34 @@ export function toggleEntryTag(id: string, tagId: string): Entry[] {
   return updated
 }
 
+// Setzt die Reihenfolge aller Einträge neu, statt Bruchteils-Positionen
+// zwischen Nachbarn zu berechnen — bei ein paar hundert Programmen kein
+// Performance-Thema, dafür ohne Sonderfall für "Lücke wird zu klein".
+function moveEntry(id: string, targetId: string | null, position: 'before' | 'after'): Entry[] {
+  const entries = getStore().get('entries')
+  const sorted = [...entries].sort((a, b) => a.order - b.order)
+
+  const fromIndex = sorted.findIndex((e) => e.id === id)
+  if (fromIndex === -1) {
+    throw new Error('Eintrag wurde nicht gefunden.')
+  }
+  const [moved] = sorted.splice(fromIndex, 1)
+
+  let insertIndex = sorted.length
+  if (targetId) {
+    const targetIndex = sorted.findIndex((e) => e.id === targetId)
+    if (targetIndex === -1) {
+      throw new Error('Zielposition wurde nicht gefunden.')
+    }
+    insertIndex = position === 'before' ? targetIndex : targetIndex + 1
+  }
+  sorted.splice(insertIndex, 0, moved)
+
+  const renumbered = sorted.map((entry, index) => ({ ...entry, order: (index + 1) * 1000 }))
+  setEntries(renumbered)
+  return renumbered
+}
+
 export function toggleFavorite(id: string): Entry[] {
   const entries = getStore().get('entries')
   const index = entries.findIndex((entry) => entry.id === id)
@@ -136,14 +167,17 @@ export async function launchEntry(id: string): Promise<void> {
   if (!entry) {
     throw new Error('Eintrag wurde nicht gefunden.')
   }
-  // Steam- und Epic-Spiele laufen über den jeweiligen Client, nicht per direktem
-  // Programmstart — sonst fehlen Overlay, Cloud-Saves und Achievements.
+  // Steam-, Epic- und Battle.net-Spiele laufen über den jeweiligen Client,
+  // nicht per direktem Programmstart — sonst fehlen Overlay, Cloud-Saves,
+  // Achievements und ggf. der Anti-Cheat-Unterbau.
   if (entry.steamAppId) {
     await shell.openExternal(`steam://rungameid/${entry.steamAppId}`)
   } else if (entry.epicAppName) {
     await shell.openExternal(
       `com.epicgames.launcher://apps/${entry.epicAppName}?action=launch&silent=true`
     )
+  } else if (entry.battlenetCode) {
+    await shell.openExternal(`battlenet://${entry.battlenetCode}`)
   } else {
     spawn(entry.path, [], { detached: true, stdio: 'ignore', cwd: dirname(entry.path) }).unref()
   }
@@ -260,6 +294,12 @@ export function registerEntryHandlers(getWindow: () => BrowserWindow | null): vo
   ipcMain.handle('entries:toggleFavorite', (_event, id: string) => toggleFavorite(id))
 
   ipcMain.handle('entries:remove', (_event, id: string) => removeEntry(id))
+
+  ipcMain.handle(
+    'entries:move',
+    (_event, id: string, targetId: string | null, position: 'before' | 'after') =>
+      moveEntry(id, targetId, position)
+  )
 
   ipcMain.handle('entries:launch', (_event, id: string) => launchEntry(id))
 

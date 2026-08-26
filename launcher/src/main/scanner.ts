@@ -3,17 +3,18 @@ import { spawn } from 'child_process'
 import { randomUUID } from 'crypto'
 import { existsSync, readdirSync, readFileSync, statSync } from 'fs'
 import { basename, join } from 'path'
-import { getStore, setEntries, type Entry } from './store'
+import { getStore, setEntries, nextOrder, type Entry } from './store'
 import { ensureIconCached, ensureSteamIconCached } from './icons'
 import { parseVdf } from './vdf'
 
 export interface Candidate {
   key: string
   name: string
-  source: 'registry' | 'steam' | 'epic'
+  source: 'registry' | 'steam' | 'epic' | 'battlenet'
   path: string
   steamAppId: string | null
   epicAppName: string | null
+  battlenetCode: string | null
   expectedProcessName: string | null
   iconHash: string | null
   alreadyImported: boolean
@@ -121,6 +122,7 @@ async function scanRegistry(existingPaths: Set<string>): Promise<Candidate[]> {
       path: exePath,
       steamAppId: null,
       epicAppName: null,
+      battlenetCode: null,
       expectedProcessName: basename(exePath),
       iconHash,
       alreadyImported: existingPaths.has(exePath),
@@ -202,9 +204,10 @@ function findExecutables(dir: string, depth: number): string[] {
   return results
 }
 
-// Steam-Manifeste kennen keinen Haupt-EXE-Namen — wir raten anhand der größten
-// .exe-Datei im Installationsordner, abzüglich bekannter Installer-/Anti-Cheat-Dateien.
-function resolveSteamMainExecutable(installPath: string): string | null {
+// Steam- und Battle.net-Manifeste kennen keinen Haupt-EXE-Namen — wir raten
+// anhand der größten .exe-Datei im Installationsordner, abzüglich bekannter
+// Installer-/Anti-Cheat-Dateien.
+function findMainExecutable(installPath: string): string | null {
   const candidates = findExecutables(installPath, 1).filter(
     (p) => !EXE_BLOCKLIST_PATTERN.test(basename(p))
   )
@@ -261,7 +264,8 @@ async function scanSteam(existingSteamAppIds: Set<string>): Promise<Candidate[]>
           path: installPath,
           steamAppId: appId,
           epicAppName: null,
-          expectedProcessName: resolveSteamMainExecutable(installPath),
+          battlenetCode: null,
+          expectedProcessName: findMainExecutable(installPath),
           iconHash,
           alreadyImported: existingSteamAppIds.has(appId),
           likelyRelevant: true
@@ -301,10 +305,15 @@ async function scanEpic(existingEpicAppNames: Set<string>): Promise<Candidate[]>
     if (!file.toLowerCase().endsWith('.item')) continue
 
     try {
-      const manifest = JSON.parse(readFileSync(join(EPIC_MANIFESTS_DIR, file), 'utf-8')) as Record<
-        string,
-        unknown
-      >
+      // Viele .item-Dateien des Epic-Launchers werden mit UTF-8-BOM
+      // geschrieben — Node.js entfernt das beim Lesen nicht automatisch, und
+      // JSON.parse bricht dann sang- und klanglos ab (landet im catch unten,
+      // ohne dass das Spiel je in der Liste auftaucht).
+      let raw = readFileSync(join(EPIC_MANIFESTS_DIR, file), 'utf-8')
+      if (raw.charCodeAt(0) === 0xfeff) {
+        raw = raw.slice(1)
+      }
+      const manifest = JSON.parse(raw) as Record<string, unknown>
       const displayName = manifest['DisplayName'] as string | undefined
       const installLocation = manifest['InstallLocation'] as string | undefined
       const launchExecutable = manifest['LaunchExecutable'] as string | undefined
@@ -322,6 +331,7 @@ async function scanEpic(existingEpicAppNames: Set<string>): Promise<Candidate[]>
         path: installLocation,
         steamAppId: null,
         epicAppName: appName,
+        battlenetCode: null,
         expectedProcessName: basename(launchExecutable),
         iconHash,
         alreadyImported: existingEpicAppNames.has(appName),
@@ -330,6 +340,63 @@ async function scanEpic(existingEpicAppNames: Set<string>): Promise<Candidate[]>
     } catch {
       continue
     }
+  }
+
+  return candidates
+}
+
+const BATTLENET_CONFIG_PATH = join(
+  process.env.APPDATA ?? 'C:\\Users\\Default\\AppData\\Roaming',
+  'Battle.net',
+  'Battle.net.config'
+)
+
+interface BattleNetGameEntry {
+  InstallPath?: string
+}
+
+// Battle.net legt — anders als Steam/Epic — keine einzeln lesbare Manifest-
+// Datei pro Spiel an, sondern eine gemeinsame Konfigurationsdatei mit einem
+// "Games"-Objekt, dessen Schlüssel die internen Produktcodes sind (z. B.
+// "wow", "fenris" für Diablo IV). Diese Codes sind gleichzeitig die
+// battlenet://<code>-Kennung zum Starten — wir lesen sie direkt aus der
+// Datei, statt eine eigene, schnell veraltende Zuordnungstabelle zu pflegen.
+async function scanBattleNet(existingCodes: Set<string>): Promise<Candidate[]> {
+  if (!existsSync(BATTLENET_CONFIG_PATH)) return []
+
+  let config: Record<string, unknown>
+  try {
+    config = JSON.parse(readFileSync(BATTLENET_CONFIG_PATH, 'utf-8'))
+  } catch {
+    return []
+  }
+
+  const games = config['Games']
+  if (!games || typeof games !== 'object') return []
+
+  const candidates: Candidate[] = []
+
+  for (const [code, value] of Object.entries(games as Record<string, unknown>)) {
+    const installPath = (value as BattleNetGameEntry | undefined)?.InstallPath
+    if (!installPath || !existsSync(installPath)) continue
+
+    const exeName = findMainExecutable(installPath)
+    if (!exeName) continue
+
+    const iconHash = await ensureIconCached(join(installPath, exeName))
+    candidates.push({
+      key: `battlenet:${code}`,
+      name: basename(installPath),
+      source: 'battlenet',
+      path: installPath,
+      steamAppId: null,
+      epicAppName: null,
+      battlenetCode: code,
+      expectedProcessName: exeName,
+      iconHash,
+      alreadyImported: existingCodes.has(code),
+      likelyRelevant: true
+    })
   }
 
   return candidates
@@ -344,14 +411,19 @@ async function scan(): Promise<Candidate[]> {
   const existingEpicAppNames = new Set(
     entries.map((e) => e.epicAppName).filter((id): id is string => !!id)
   )
+  const existingBattlenetCodes = new Set(
+    entries.map((e) => e.battlenetCode).filter((id): id is string => !!id)
+  )
 
-  const [registryCandidates, steamCandidates, epicCandidates] = await Promise.all([
-    scanRegistry(existingPaths),
-    scanSteam(existingSteamAppIds),
-    scanEpic(existingEpicAppNames)
-  ])
+  const [registryCandidates, steamCandidates, epicCandidates, battlenetCandidates] =
+    await Promise.all([
+      scanRegistry(existingPaths),
+      scanSteam(existingSteamAppIds),
+      scanEpic(existingEpicAppNames),
+      scanBattleNet(existingBattlenetCodes)
+    ])
 
-  return [...steamCandidates, ...epicCandidates, ...registryCandidates]
+  return [...steamCandidates, ...epicCandidates, ...battlenetCandidates, ...registryCandidates]
 }
 
 // Der Renderer schickt die zuvor per scan() gelieferten Kandidaten zurück —
@@ -365,8 +437,12 @@ async function importCandidates(candidates: Candidate[]): Promise<Entry[]> {
   const existingEpicAppNames = new Set(
     entries.map((e) => e.epicAppName).filter((id): id is string => !!id)
   )
+  const existingBattlenetCodes = new Set(
+    entries.map((e) => e.battlenetCode).filter((id): id is string => !!id)
+  )
 
   const newEntries: Entry[] = []
+  let order = nextOrder(entries) - 1000
 
   for (const candidate of candidates) {
     if (candidate.source === 'steam') {
@@ -375,6 +451,9 @@ async function importCandidates(candidates: Candidate[]): Promise<Entry[]> {
     } else if (candidate.source === 'epic') {
       if (!candidate.epicAppName) continue
       if (existingEpicAppNames.has(candidate.epicAppName)) continue
+    } else if (candidate.source === 'battlenet') {
+      if (!candidate.battlenetCode) continue
+      if (existingBattlenetCodes.has(candidate.battlenetCode)) continue
     } else {
       if (!existsSync(candidate.path)) continue
       if (existingPaths.has(candidate.path)) continue
@@ -389,8 +468,10 @@ async function importCandidates(candidates: Candidate[]): Promise<Entry[]> {
       addedAt: Date.now(),
       steamAppId: candidate.steamAppId,
       epicAppName: candidate.epicAppName,
+      battlenetCode: candidate.battlenetCode,
       favorite: false,
-      expectedProcessName: candidate.expectedProcessName
+      expectedProcessName: candidate.expectedProcessName,
+      order: (order += 1000)
     })
   }
 

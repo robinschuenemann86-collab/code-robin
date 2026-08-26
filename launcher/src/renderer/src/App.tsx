@@ -1,14 +1,16 @@
 import { useEffect, useMemo, useState, type DragEvent, type ReactElement } from 'react'
-import type { Entry, EntryStats, SortMode, Tag, ViewMode } from './types'
+import type { Entry, EntryStats, OverviewData, SortMode, Tag, ViewMode } from './types'
 import type { UpdaterStatus } from '../../main/updater'
 import { EntryIcon } from './components/EntryIcon'
 import { Sidebar } from './components/Sidebar'
 import { DetailPanel } from './components/DetailPanel'
 import { ScannerDialog } from './components/ScannerDialog'
 import { StatsDialog } from './components/StatsDialog'
+import { OverviewDialog } from './components/OverviewDialog'
 import { BigPictureView } from './components/BigPictureView'
 import {
   IconAlertTriangle,
+  IconApps,
   IconClock,
   IconExpand,
   IconMore,
@@ -33,6 +35,8 @@ function App(): ReactElement {
   const [status, setStatus] = useState('')
   const [scannerOpen, setScannerOpen] = useState(false)
   const [statsOpen, setStatsOpen] = useState(false)
+  const [overviewOpen, setOverviewOpen] = useState(false)
+  const [overview, setOverview] = useState<OverviewData | null>(null)
   const [updaterStatus, setUpdaterStatus] = useState<UpdaterStatus | null>(null)
   const [bigPictureMode, setBigPictureMode] = useState(false)
 
@@ -44,6 +48,8 @@ function App(): ReactElement {
   const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null)
   const [draggingOver, setDraggingOver] = useState(false)
   const [missingPaths, setMissingPaths] = useState<Set<string>>(new Set())
+  const [draggedEntryId, setDraggedEntryId] = useState<string | null>(null)
+  const [dragOverEntryId, setDragOverEntryId] = useState<string | null>(null)
 
   useEffect(() => {
     Promise.all([window.api.listEntries(), window.api.listTags(), window.api.listStats()]).then(
@@ -86,6 +92,12 @@ function App(): ReactElement {
     }
   }, [selectedEntryId, statsOpen])
 
+  useEffect(() => {
+    if (overviewOpen) {
+      window.api.getOverview().then(setOverview)
+    }
+  }, [overviewOpen])
+
   const filteredEntries = useMemo(() => {
     const query = searchQuery.trim().toLowerCase()
     const statsByEntry = new Map(stats.map((s) => [s.entryId, s]))
@@ -112,6 +124,8 @@ function App(): ReactElement {
             (statsByEntry.get(b.id)?.totalPlayedMs ?? 0) -
             (statsByEntry.get(a.id)?.totalPlayedMs ?? 0)
           )
+        case 'custom':
+          return a.order - b.order
         case 'added':
         default:
           return b.addedAt - a.addedAt
@@ -138,12 +152,23 @@ function App(): ReactElement {
     setEntries(updated)
   }
 
-  // Electron reichert File-Objekte aus Drag&Drop um einen echten Dateisystem-
-  // pfad an (`.path`) — Standard-Web-APIs kennen das nicht, ist aber die
-  // übliche Electron-Erweiterung dafür.
+  // Zwei ganz unterschiedliche Dinge landen im selben onDrop: von außen
+  // hereingezogene Dateien (neues Programm) und intern verschobene Kacheln
+  // (Umsortieren). Ein Fallback aufs Container-Element, falls jemand eine
+  // Kachel hinter die letzte fallen lässt statt genau auf eine andere.
   async function handleDrop(e: DragEvent): Promise<void> {
     e.preventDefault()
     setDraggingOver(false)
+
+    if (draggedEntryId) {
+      const lastEntry = filteredEntries[filteredEntries.length - 1]
+      if (lastEntry) handleMoveEntry(draggedEntryId, lastEntry.id, 'after')
+      return
+    }
+
+    // Electron reichert File-Objekte aus Drag&Drop um einen echten Dateisystem-
+    // pfad an (`.path`) — Standard-Web-APIs kennen das nicht, ist aber die
+    // übliche Electron-Erweiterung dafür.
     const paths = Array.from(e.dataTransfer.files)
       .map((file) => file.path)
       .filter((path) => /\.(exe|lnk)$/i.test(path))
@@ -178,6 +203,13 @@ function App(): ReactElement {
 
   async function handleChangeIcon(id: string): Promise<void> {
     setEntries(await window.api.pickCustomIcon(id))
+  }
+
+  async function handleMoveEntry(id: string, targetId: string, position: 'before' | 'after'): Promise<void> {
+    setDraggedEntryId(null)
+    setDragOverEntryId(null)
+    if (id === targetId) return
+    setEntries(await window.api.moveEntry(id, targetId, position))
   }
 
   async function handleInstallUpdate(): Promise<void> {
@@ -273,43 +305,52 @@ function App(): ReactElement {
         <div className="flex items-center gap-3">
           <img src={logo} alt="" className="h-20 w-20 rounded-md object-cover" />
           <div>
-            <h1 className="text-lg font-semibold tracking-tight">MR Launch</h1>
-            <p className="text-sm text-text-muted">{entries.length} Programme</p>
+            <h1 className="ember-grad-text font-display text-2xl font-extrabold uppercase tracking-tight">
+              MR Launch
+            </h1>
+            <p className="text-sm font-medium text-text-muted">{entries.length} Programme</p>
           </div>
         </div>
         <div className="flex gap-2">
           <button
             onClick={() => window.api.setFullscreen(true)}
             title="Big-Picture-Modus"
-            className="rounded-lg border border-border bg-panel p-2.5 text-text transition hover:border-cyan/50 hover:text-cyan"
+            className="rounded-lg border border-border bg-panel p-2.5 text-text transition hover:border-gold/50 hover:text-gold"
           >
             <IconExpand />
           </button>
           <button
+            onClick={() => setOverviewOpen(true)}
+            title="Übersicht"
+            className="rounded-lg border border-border bg-panel p-2.5 text-text transition hover:border-gold/50 hover:text-gold"
+          >
+            <IconApps />
+          </button>
+          <button
             onClick={() => setStatsOpen(true)}
             title="Statistik"
-            className="rounded-lg border border-border bg-panel p-2.5 text-text transition hover:border-cyan/50 hover:text-cyan"
+            className="rounded-lg border border-border bg-panel p-2.5 text-text transition hover:border-gold/50 hover:text-gold"
           >
             <IconClock />
           </button>
           <button
             onClick={() => setScannerOpen(true)}
             title="Programme suchen"
-            className="rounded-lg border border-border bg-panel p-2.5 text-text transition hover:border-cyan/50 hover:text-cyan"
+            className="rounded-lg border border-border bg-panel p-2.5 text-text transition hover:border-gold/50 hover:text-gold"
           >
             <IconSearch />
           </button>
           <button
             onClick={handleAdd}
             title="Programm hinzufügen"
-            className="glow-pink rounded-lg bg-pink p-2.5 text-white transition hover:brightness-110"
+            className="glow-ember ember-grad-bg rounded-lg p-2.5 text-on-ember transition hover:brightness-110"
           >
             <IconPlus />
           </button>
           <button
             onClick={() => window.api.showAppMenu()}
             title="Weitere Optionen"
-            className="rounded-lg border border-border bg-panel p-2.5 text-text transition hover:border-cyan/50 hover:text-cyan"
+            className="rounded-lg border border-border bg-panel p-2.5 text-text transition hover:border-gold/50 hover:text-gold"
           >
             <IconMore />
           </button>
@@ -317,20 +358,20 @@ function App(): ReactElement {
       </header>
 
       {updaterStatus?.state === 'downloading' && (
-        <div className="relative overflow-hidden border-b border-cyan/30 bg-panel-active px-8 py-2 text-sm text-text">
+        <div className="relative overflow-hidden border-b border-gold/30 bg-panel-active px-8 py-2 text-sm text-text">
           <span>Update wird heruntergeladen … {updaterStatus.percent}%</span>
           <div
-            className="absolute inset-x-0 bottom-0 h-0.5 bg-cyan transition-all"
+            className="absolute inset-x-0 bottom-0 h-0.5 bg-gold transition-all"
             style={{ width: `${updaterStatus.percent}%` }}
           />
         </div>
       )}
       {updaterStatus?.state === 'downloaded' && (
-        <div className="glow-cyan flex items-center justify-between border-b border-cyan/40 bg-panel-active px-8 py-2 text-sm text-text">
+        <div className="glow-gold flex items-center justify-between border-b border-gold/40 bg-panel-active px-8 py-2 text-sm text-text">
           <span>Update auf Version {updaterStatus.version} ist bereit.</span>
           <button
             onClick={handleInstallUpdate}
-            className="glow-pink rounded-lg bg-pink px-3 py-1.5 text-sm text-white transition hover:brightness-110"
+            className="glow-ember ember-grad-bg rounded-lg px-3 py-1.5 text-sm text-on-ember transition hover:brightness-110"
           >
             Jetzt neu starten
           </button>
@@ -366,12 +407,14 @@ function App(): ReactElement {
           onDragLeave={() => setDraggingOver(false)}
           onDrop={handleDrop}
           className={`flex-1 overflow-y-auto p-8 transition ${
-            draggingOver ? 'bg-panel-active outline-dashed outline-2 outline-cyan/50 -outline-offset-4' : ''
+            draggingOver ? 'bg-panel-active outline-dashed outline-2 outline-gold/50 -outline-offset-4' : ''
           }`}
         >
           {recentlyPlayed.length > 0 && (
             <div className="mb-6">
-              <h2 className="mb-3 text-sm font-medium text-text-muted">Zuletzt gespielt</h2>
+              <h2 className="font-display mb-3 text-xs font-bold uppercase tracking-wider text-text-muted">
+                Zuletzt gespielt
+              </h2>
               <div className="flex gap-3 overflow-x-auto pb-1">
                 {recentlyPlayed.map((entry) => (
                   <button
@@ -380,8 +423,8 @@ function App(): ReactElement {
                     onDoubleClick={() => handleLaunch(entry)}
                     className={`flex w-24 shrink-0 flex-col items-center gap-2 rounded-xl border p-3 text-center transition ${
                       selectedEntryId === entry.id
-                        ? 'glow-cyan border-cyan/60 bg-panel-active'
-                        : 'border-border bg-panel hover:border-cyan/30 hover:bg-panel-hover'
+                        ? 'glow-gold border-gold/60 bg-panel-active'
+                        : 'border-border bg-panel hover:border-gold/30 hover:bg-panel-hover'
                     }`}
                   >
                     <EntryIcon iconHash={entry.iconHash} />
@@ -392,6 +435,11 @@ function App(): ReactElement {
               <div className="divider mt-6" />
             </div>
           )}
+          {!loading && filteredEntries.length > 0 && (
+            <h2 className="font-display mb-3 text-xs font-bold uppercase tracking-wider text-text-muted">
+              Deine Bibliothek
+            </h2>
+          )}
           {loading ? (
             <p className="text-sm text-text-muted">Lade …</p>
           ) : entries.length === 0 ? (
@@ -400,7 +448,7 @@ function App(): ReactElement {
               <p className="text-sm">Noch keine Programme</p>
               <button
                 onClick={handleAdd}
-                className="glow-pink rounded-lg bg-pink px-4 py-2 text-sm text-white transition hover:brightness-110"
+                className="glow-ember ember-grad-bg rounded-lg px-4 py-2 text-sm text-on-ember transition hover:brightness-110"
               >
                 Programm hinzufügen
               </button>
@@ -410,7 +458,7 @@ function App(): ReactElement {
               <IconSearch className="h-8 w-8" />
               <button
                 onClick={resetFilters}
-                className="text-sm text-cyan underline hover:brightness-125"
+                className="text-sm text-gold underline hover:brightness-125"
               >
                 Filter zurücksetzen
               </button>
@@ -420,6 +468,23 @@ function App(): ReactElement {
               {filteredEntries.map((entry) => (
                 <div
                   key={entry.id}
+                  draggable={sortMode === 'custom'}
+                  onDragStart={() => setDraggedEntryId(entry.id)}
+                  onDragEnd={() => {
+                    setDraggedEntryId(null)
+                    setDragOverEntryId(null)
+                  }}
+                  onDragOver={(e) => {
+                    if (sortMode !== 'custom' || !draggedEntryId) return
+                    e.preventDefault()
+                    setDragOverEntryId(entry.id)
+                  }}
+                  onDrop={(e) => {
+                    if (sortMode !== 'custom' || !draggedEntryId) return
+                    e.preventDefault()
+                    e.stopPropagation()
+                    handleMoveEntry(draggedEntryId, entry.id, 'before')
+                  }}
                   onClick={() => setSelectedEntryId(entry.id)}
                   onDoubleClick={() => handleLaunch(entry)}
                   onContextMenu={() => {
@@ -427,10 +492,12 @@ function App(): ReactElement {
                     window.api.showEntryContextMenu(entry.id)
                   }}
                   className={`group relative flex cursor-pointer flex-col items-center gap-2 rounded-xl border p-4 text-center transition ${
-                    selectedEntryId === entry.id
-                      ? 'glow-cyan border-cyan/60 bg-panel-active'
-                      : 'border-border bg-panel hover:border-cyan/30 hover:bg-panel-hover'
-                  }`}
+                    dragOverEntryId === entry.id && draggedEntryId && draggedEntryId !== entry.id
+                      ? 'border-gold bg-panel-active'
+                      : selectedEntryId === entry.id
+                        ? 'glow-gold border-gold/60 bg-panel-active'
+                        : 'border-border bg-panel hover:border-gold/30 hover:bg-panel-hover'
+                  } ${draggedEntryId === entry.id ? 'opacity-40' : ''}`}
                 >
                   <button
                     onClick={(e) => {
@@ -459,7 +526,7 @@ function App(): ReactElement {
                   <div className="relative">
                     <EntryIcon iconHash={entry.iconHash} />
                     {isNewEntry(entry) && (
-                      <span className="absolute -right-1 -top-1 rounded-full bg-pink px-1.5 py-0.5 text-[9px] font-semibold leading-none text-white">
+                      <span className="absolute -right-1 -top-1 rounded-full ember-grad-bg px-1.5 py-0.5 text-[9px] font-semibold leading-none text-on-ember">
                         NEU
                       </span>
                     )}
@@ -481,6 +548,23 @@ function App(): ReactElement {
               {filteredEntries.map((entry) => (
                 <div
                   key={entry.id}
+                  draggable={sortMode === 'custom'}
+                  onDragStart={() => setDraggedEntryId(entry.id)}
+                  onDragEnd={() => {
+                    setDraggedEntryId(null)
+                    setDragOverEntryId(null)
+                  }}
+                  onDragOver={(e) => {
+                    if (sortMode !== 'custom' || !draggedEntryId) return
+                    e.preventDefault()
+                    setDragOverEntryId(entry.id)
+                  }}
+                  onDrop={(e) => {
+                    if (sortMode !== 'custom' || !draggedEntryId) return
+                    e.preventDefault()
+                    e.stopPropagation()
+                    handleMoveEntry(draggedEntryId, entry.id, 'before')
+                  }}
                   onClick={() => setSelectedEntryId(entry.id)}
                   onDoubleClick={() => handleLaunch(entry)}
                   onContextMenu={() => {
@@ -488,10 +572,12 @@ function App(): ReactElement {
                     window.api.showEntryContextMenu(entry.id)
                   }}
                   className={`group flex cursor-pointer items-center gap-3 rounded-lg border px-3 py-2 transition ${
-                    selectedEntryId === entry.id
-                      ? 'glow-cyan border-cyan/60 bg-panel-active'
-                      : 'border-transparent hover:bg-panel-hover'
-                  }`}
+                    dragOverEntryId === entry.id && draggedEntryId && draggedEntryId !== entry.id
+                      ? 'border-gold bg-panel-active'
+                      : selectedEntryId === entry.id
+                        ? 'glow-gold border-gold/60 bg-panel-active'
+                        : 'border-transparent hover:bg-panel-hover'
+                  } ${draggedEntryId === entry.id ? 'opacity-40' : ''}`}
                 >
                   <EntryIcon iconHash={entry.iconHash} className="h-8 w-8" />
                   <span className="flex flex-1 items-center gap-1.5 truncate text-sm font-medium">
@@ -503,7 +589,7 @@ function App(): ReactElement {
                     )}
                     <span className="truncate">{entry.name}</span>
                     {isNewEntry(entry) && (
-                      <span className="shrink-0 rounded-full bg-pink px-1.5 py-0.5 text-[9px] font-semibold leading-none text-white">
+                      <span className="shrink-0 rounded-full ember-grad-bg px-1.5 py-0.5 text-[9px] font-semibold leading-none text-on-ember">
                         NEU
                       </span>
                     )}
@@ -583,6 +669,15 @@ function App(): ReactElement {
 
       {statsOpen && (
         <StatsDialog entries={entries} stats={stats} onClose={() => setStatsOpen(false)} />
+      )}
+
+      {overviewOpen && overview && (
+        <OverviewDialog
+          entries={entries}
+          stats={stats}
+          overview={overview}
+          onClose={() => setOverviewOpen(false)}
+        />
       )}
     </div>
   )

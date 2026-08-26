@@ -1,6 +1,6 @@
 import type { Entry, Tag } from '../main/store'
 import type { Candidate } from '../main/scanner'
-import type { EntryStats } from '../main/stats'
+import type { EntryStats, OverviewData } from '../main/stats'
 import type { UpdaterStatus } from '../main/updater'
 
 export interface LauncherApi {
@@ -9,6 +9,7 @@ export interface LauncherApi {
   renameEntry: (id: string, name: string) => Promise<Entry[]>
   toggleEntryTag: (id: string, tagId: string) => Promise<Entry[]>
   removeEntry: (id: string) => Promise<Entry[]>
+  moveEntry: (id: string, targetId: string | null, position: 'before' | 'after') => Promise<Entry[]>
   launchEntry: (id: string) => Promise<void>
   getEntrySize: (id: string) => Promise<number | null>
   toggleFavorite: (id: string) => Promise<Entry[]>
@@ -27,6 +28,7 @@ export interface LauncherApi {
   importCandidates: (candidates: Candidate[]) => Promise<Entry[]>
 
   listStats: () => Promise<EntryStats[]>
+  getOverview: () => Promise<OverviewData>
 
   onUpdaterStatus: (callback: (status: UpdaterStatus) => void) => () => void
   installUpdate: () => Promise<void>
