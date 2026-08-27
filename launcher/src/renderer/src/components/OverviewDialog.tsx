@@ -2,6 +2,7 @@ import { useMemo, type ReactElement } from 'react'
 import type { Entry, EntryStats, OverviewData } from '../types'
 import { EntryIcon } from './EntryIcon'
 import { IconX } from './icons'
+import { useEscapeToClose } from '../hooks'
 
 interface OverviewDialogProps {
   entries: Entry[]
@@ -39,6 +40,7 @@ export function OverviewDialog({
   overview,
   onClose
 }: OverviewDialogProps): ReactElement {
+  useEscapeToClose(onClose)
   const thisWeek = overview.weekActivity.slice(21, 28)
   const daysActive = thisWeek.filter((d) => d === true).length
   const ringOffset = RING_CIRCUMFERENCE * (1 - daysActive / 7)
@@ -127,7 +129,13 @@ export function OverviewDialog({
                 <div className="truncate text-xl font-extrabold">{mostPlayed?.name ?? '—'}</div>
                 <div className="text-xs font-semibold text-text-muted">Meistgespielt</div>
               </div>
-              {mostPlayed && <EntryIcon iconHash={mostPlayed.iconHash} className="h-8 w-8 shrink-0" />}
+              {mostPlayed && (
+                <EntryIcon
+                  iconHash={mostPlayed.iconHash}
+                  coverHash={mostPlayed.coverHash}
+                  className="h-8 w-8 shrink-0"
+                />
+              )}
             </div>
             <div className="flex items-center justify-between rounded-xl border border-border bg-panel px-5 py-3">
               <div>
@@ -178,7 +186,11 @@ export function OverviewDialog({
             ) : (
               recent.map(({ session, entry }) => (
                 <div key={`${entry.id}-${session.endedAt}`} className="flex items-center gap-3">
-                  <EntryIcon iconHash={entry.iconHash} className="h-9 w-9 shrink-0" />
+                  <EntryIcon
+                    iconHash={entry.iconHash}
+                    coverHash={entry.coverHash}
+                    className="h-9 w-9 shrink-0"
+                  />
                   <div className="flex min-w-0 flex-col gap-0.5">
                     <span className="truncate text-sm font-bold">{entry.name}</span>
                     <span className="text-xs text-text-muted">

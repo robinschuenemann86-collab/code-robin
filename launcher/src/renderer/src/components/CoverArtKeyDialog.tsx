@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactElement } from 'react'
 import { IconCheck, IconX } from './icons'
+import { useEscapeToClose } from '../hooks'
 
 interface CoverArtKeyDialogProps {
   onClose: () => void
@@ -8,6 +9,8 @@ interface CoverArtKeyDialogProps {
 export function CoverArtKeyDialog({ onClose }: CoverArtKeyDialogProps): ReactElement {
   const [key, setKey] = useState('')
   const [saved, setSaved] = useState(false)
+
+  useEscapeToClose(onClose)
 
   useEffect(() => {
     window.api.getCoverArtKey().then((existing) => setKey(existing ?? ''))

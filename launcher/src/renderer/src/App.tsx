@@ -284,6 +284,10 @@ function App(): ReactElement {
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent): void {
       if (bigPictureMode) return
+      // Sonst würden Pfeiltasten/Enter/Entf durch einen offenen Dialog
+      // hindurch auf die dahinterliegende Bibliothek wirken — z. B. Enter
+      // startet ein Spiel, während gerade der Übersicht-Dialog offen ist.
+      if (scannerOpen || statsOpen || overviewOpen || coverArtKeyDialogOpen) return
       const activeTag = document.activeElement?.tagName
       if (activeTag === 'INPUT' || activeTag === 'TEXTAREA' || activeTag === 'SELECT') return
       if (filteredEntries.length === 0) return
@@ -310,14 +314,28 @@ function App(): ReactElement {
       } else if ((e.key === 'Delete' || e.key === 'Backspace') && selectedEntry) {
         e.preventDefault()
         handleDelete(selectedEntry)
+      } else if (e.key.toLowerCase() === 'f' && selectedEntry) {
+        // Der Favoriten-Stern auf der Kachel ist nur per Hover erreichbar —
+        // ohne das ließe sich Favorisieren rein per Tastatur gar nicht auslösen.
+        e.preventDefault()
+        handleToggleFavorite(selectedEntry)
       }
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-    // handleLaunch/handleDelete read `entries` via the `selectedEntry` closure captured above,
-    // so listing them here would only force pointless re-subscriptions on every render.
+    // handleLaunch/handleDelete/handleToggleFavorite read `entries` via the `selectedEntry`
+    // closure captured above, so listing them here would only force pointless re-subscriptions.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filteredEntries, selectedEntryId, selectedEntry, bigPictureMode])
+  }, [
+    filteredEntries,
+    selectedEntryId,
+    selectedEntry,
+    bigPictureMode,
+    scannerOpen,
+    statsOpen,
+    overviewOpen,
+    coverArtKeyDialogOpen
+  ])
 
   function resetFilters(): void {
     setSearchQuery('')
@@ -543,11 +561,13 @@ function App(): ReactElement {
                       e.stopPropagation()
                       handleToggleFavorite(entry)
                     }}
-                    title="Favorit"
+                    title="Favorit (F)"
                     className={`absolute left-2 top-2 z-10 p-1 ${
                       entry.favorite
                         ? 'block text-amber'
-                        : 'hidden text-text-muted hover:text-amber group-hover:block group-focus-within:block'
+                        : selectedEntryId === entry.id
+                          ? 'block text-text-muted hover:text-amber'
+                          : 'hidden text-text-muted hover:text-amber group-hover:block group-focus-within:block'
                     }`}
                   >
                     <IconStar className="h-3.5 w-3.5" filled={entry.favorite} />
@@ -557,8 +577,12 @@ function App(): ReactElement {
                       e.stopPropagation()
                       handleDelete(entry)
                     }}
-                    title="Entfernen"
-                    className="absolute right-2 top-2 z-10 hidden rounded-md bg-panel-hover p-1 hover:bg-panel-active group-hover:block group-focus-within:block"
+                    title="Entfernen (Entf)"
+                    className={`absolute right-2 top-2 z-10 rounded-md bg-panel-hover p-1 hover:bg-panel-active ${
+                      selectedEntryId === entry.id
+                        ? 'block'
+                        : 'hidden group-hover:block group-focus-within:block'
+                    }`}
                   >
                     <IconTrash className="h-3.5 w-3.5" />
                   </button>
@@ -622,7 +646,11 @@ function App(): ReactElement {
                         : 'border-transparent hover:bg-panel-hover'
                   } ${draggedEntryId === entry.id ? 'opacity-40' : ''}`}
                 >
-                  <EntryIcon iconHash={entry.iconHash} className="h-8 w-8" />
+                  <EntryIcon
+                    iconHash={entry.iconHash}
+                    coverHash={entry.coverHash}
+                    className="h-8 w-8"
+                  />
                   <span className="flex flex-1 items-center gap-1.5 truncate text-sm font-medium">
                     {missingPaths.has(entry.id) && (
                       <IconAlertTriangle
@@ -650,11 +678,13 @@ function App(): ReactElement {
                       e.stopPropagation()
                       handleToggleFavorite(entry)
                     }}
-                    title="Favorit"
+                    title="Favorit (F)"
                     className={`p-1 ${
                       entry.favorite
                         ? 'text-amber'
-                        : 'hidden text-text-muted hover:text-amber group-hover:inline-flex group-focus-within:inline-flex'
+                        : selectedEntryId === entry.id
+                          ? 'inline-flex text-text-muted hover:text-amber'
+                          : 'hidden text-text-muted hover:text-amber group-hover:inline-flex group-focus-within:inline-flex'
                     }`}
                   >
                     <IconStar className="h-3.5 w-3.5" filled={entry.favorite} />
@@ -664,8 +694,12 @@ function App(): ReactElement {
                       e.stopPropagation()
                       handleDelete(entry)
                     }}
-                    title="Entfernen"
-                    className="hidden rounded-md bg-panel-hover p-1 hover:bg-panel-active group-hover:block group-focus-within:block"
+                    title="Entfernen (Entf)"
+                    className={`rounded-md bg-panel-hover p-1 hover:bg-panel-active ${
+                      selectedEntryId === entry.id
+                        ? 'block'
+                        : 'hidden group-hover:block group-focus-within:block'
+                    }`}
                   >
                     <IconTrash className="h-3.5 w-3.5" />
                   </button>

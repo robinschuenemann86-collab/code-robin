@@ -22,6 +22,22 @@ registerIconProtocolScheme()
 let mainWindow: BrowserWindow | null = null
 let isQuitting = false
 
+// Ohne das startet ein zweiter Aufruf (z. B. Autostart plus manueller
+// Doppelklick auf die Verknüpfung) ein zweites Fenster samt zweitem Tray-Icon
+// und einer zweiten, mit der ersten konkurrierenden Registrierung der
+// globalen Hotkeys. app.exit() beendet diese zweite Instanz sofort, noch
+// bevor app.whenReady() unten überhaupt auflöst.
+if (!app.requestSingleInstanceLock()) {
+  app.exit(0)
+} else {
+  app.on('second-instance', () => {
+    if (!mainWindow) return
+    if (mainWindow.isMinimized()) mainWindow.restore()
+    mainWindow.show()
+    mainWindow.focus()
+  })
+}
+
 function createWindow(): void {
   const bounds = loadWindowBounds()
 

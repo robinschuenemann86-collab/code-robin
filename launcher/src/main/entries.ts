@@ -4,7 +4,7 @@ import { randomUUID } from 'crypto'
 import { basename, dirname, extname, join } from 'path'
 import { readdir, stat } from 'fs/promises'
 import { existsSync } from 'fs'
-import { getStore, setEntries, nextOrder, type Entry } from './store'
+import { getStore, setEntries, setSessions, nextOrder, type Entry } from './store'
 import { ensureIconCached, removeCachedIcon, setCustomIcon } from './icons'
 import { startSession } from './playtime'
 import { fetchCoverArtForNewEntries } from './coverArt'
@@ -13,24 +13,48 @@ function deriveName(targetPath: string): string {
   return basename(targetPath, extname(targetPath))
 }
 
+// Windows-Pfade sind nicht case-sensitiv — ohne das würde dasselbe Programm
+// zweimal auftauchen, wenn eine Verknüpfung oder ein zweiter Datei-Dialog den
+// Pfad mit anderer Groß-/Kleinschreibung liefert.
+function pathKey(path: string): string {
+  return path.toLowerCase()
+}
+
+// .lnk-Verknüpfungen sind über den Datei-Dialog und Drag & Drop wählbar,
+// zeigen aber selbst nicht auf eine ausführbare Datei — ohne Auflösung landet
+// der Verknüpfungspfad unverändert in `path` und spawn() kann ihn beim Start
+// nicht ausführen. Bei einer defekten/nicht lesbaren Verknüpfung bleibt es
+// beim Original-Pfad; das führt dann zu einer Fehlermeldung beim Start statt
+// zu einem stillen Fehlschlag hier.
+function resolveLaunchPath(filePath: string): string {
+  if (extname(filePath).toLowerCase() !== '.lnk') return filePath
+  try {
+    const { target } = shell.readShortcutLink(filePath)
+    return target || filePath
+  } catch {
+    return filePath
+  }
+}
+
 // Gemeinsame Basis für den Datei-Dialog und Drag & Drop — beide liefern am
 // Ende nur eine Liste von Dateipfaden, der Rest (Dubletten prüfen, Icon
 // laden, Eintrag anlegen) ist identisch.
 async function addEntriesFromPaths(paths: string[]): Promise<Entry[]> {
   const existing = getStore().get('entries')
-  const existingPaths = new Set(existing.map((entry) => entry.path))
+  const existingPaths = new Set(existing.map((entry) => pathKey(entry.path)))
 
   const newEntries: Entry[] = []
   let order = nextOrder(existing) - 1000
   for (const filePath of paths) {
-    if (existingPaths.has(filePath) || !existsSync(filePath)) {
-      continue
-    }
+    if (!existsSync(filePath)) continue
+    const resolvedPath = resolveLaunchPath(filePath)
+    if (existingPaths.has(pathKey(resolvedPath))) continue
+
     const iconHash = await ensureIconCached(filePath)
     newEntries.push({
       id: randomUUID(),
       name: deriveName(filePath),
-      path: filePath,
+      path: resolvedPath,
       iconHash,
       coverHash: null,
       tags: [],
@@ -39,9 +63,10 @@ async function addEntriesFromPaths(paths: string[]): Promise<Entry[]> {
       epicAppName: null,
       battlenetCode: null,
       favorite: false,
-      expectedProcessName: basename(filePath),
+      expectedProcessName: basename(resolvedPath),
       order: (order += 1000)
     })
+    existingPaths.add(pathKey(resolvedPath))
   }
 
   const updated = [...existing, ...newEntries]
@@ -162,6 +187,11 @@ export async function removeEntry(id: string): Promise<Entry[]> {
     await removeCachedIcon(target.coverHash)
   }
 
+  // Sonst sammeln sich Spielzeit-Sitzungen für längst entfernte Programme
+  // unbegrenzt in der Datendatei an — sichtbar sind sie ohnehin nirgends
+  // mehr, da jede Auswertung über die (jetzt fehlende) entryId joint.
+  setSessions(getStore().get('sessions').filter((session) => session.entryId !== id))
+
   setEntries(remaining)
   return remaining
 }
@@ -186,10 +216,26 @@ export async function launchEntry(id: string): Promise<void> {
   } else if (entry.battlenetCode) {
     await shell.openExternal(`battlenet://${entry.battlenetCode}`)
   } else {
-    spawn(entry.path, [], { detached: true, stdio: 'ignore', cwd: dirname(entry.path) }).unref()
+    await spawnDetached(entry.path, dirname(entry.path))
   }
 
   startSession(entry.id, entry.expectedProcessName)
+}
+
+// spawn() meldet einen ungültigen Pfad (z. B. ein verschobenes/deinstalliertes
+// Programm) erst asynchronisch über das "error"-Event. Ohne Listener dafür
+// wird das zu einer unbehandelten Exception im Main-Prozess — die ganze App
+// stürzt ab, statt dass der Start einfach fehlschlägt und der Renderer eine
+// Fehlermeldung zeigen kann.
+function spawnDetached(path: string, cwd: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const child = spawn(path, [], { detached: true, stdio: 'ignore', cwd })
+    child.once('error', reject)
+    child.once('spawn', () => {
+      child.unref()
+      resolve()
+    })
+  })
 }
 
 // Läuft rekursiv einen Ordner ab und summiert die Dateigrößen. Einzelne

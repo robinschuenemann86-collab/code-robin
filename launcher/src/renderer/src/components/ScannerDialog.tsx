@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type ReactElement } from 'react'
 import type { Candidate } from '../types'
 import { EntryIcon } from './EntryIcon'
 import { IconAlertTriangle, IconCheck, IconDownload, IconX } from './icons'
+import { useEscapeToClose } from '../hooks'
 
 interface ScannerDialogProps {
   onClose: () => void
@@ -9,6 +10,7 @@ interface ScannerDialogProps {
 }
 
 export function ScannerDialog({ onClose, onImported }: ScannerDialogProps): ReactElement {
+  useEscapeToClose(onClose)
   const [loading, setLoading] = useState(true)
   const [importing, setImporting] = useState(false)
   const [candidates, setCandidates] = useState<Candidate[]>([])

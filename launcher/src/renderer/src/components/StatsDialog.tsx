@@ -2,6 +2,7 @@ import { useMemo, type ReactElement } from 'react'
 import type { Entry, EntryStats } from '../types'
 import { EntryIcon } from './EntryIcon'
 import { IconClock, IconX } from './icons'
+import { useEscapeToClose } from '../hooks'
 
 interface StatsDialogProps {
   entries: Entry[]
@@ -18,6 +19,7 @@ function formatDuration(ms: number): string {
 }
 
 export function StatsDialog({ entries, stats, onClose }: StatsDialogProps): ReactElement {
+  useEscapeToClose(onClose)
   const rows = useMemo(() => {
     return stats
       .map((stat) => ({ stat, entry: entries.find((e) => e.id === stat.entryId) }))
@@ -51,7 +53,11 @@ export function StatsDialog({ entries, stats, onClose }: StatsDialogProps): Reac
                   <span className="w-4 shrink-0 text-right text-xs text-text-muted">
                     {index + 1}.
                   </span>
-                  <EntryIcon iconHash={entry.iconHash} className="h-8 w-8" />
+                  <EntryIcon
+                    iconHash={entry.iconHash}
+                    coverHash={entry.coverHash}
+                    className="h-8 w-8"
+                  />
                   <span className="flex-1 truncate text-sm">{entry.name}</span>
                   <span className="text-xs text-text-muted">
                     {stat.launchCount}× ·{' '}

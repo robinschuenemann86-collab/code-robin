@@ -1,6 +1,24 @@
 import { dialog, type BrowserWindow } from 'electron'
 import { readFile, writeFile } from 'fs/promises'
-import { getStore, parseStoreData, replaceStoreData, type Entry } from './store'
+import { getStore, parseStoreData, replaceStoreData, type Entry, type StoreData } from './store'
+import { iconFilePath } from './icons'
+
+interface BackupFile {
+  data: StoreData
+  // hash -> Base64-PNG. Ohne das zeigt eine Sicherung nach dem Wiederherstellen
+  // (z. B. auf einem anderen PC oder nach geleertem Cache-Ordner) nur noch
+  // Platzhalter, obwohl iconHash/coverHash in den Einträgen selbst intakt sind.
+  icons: Record<string, string>
+}
+
+function collectReferencedHashes(entries: Entry[]): Set<string> {
+  const hashes = new Set<string>()
+  for (const entry of entries) {
+    if (entry.iconHash) hashes.add(entry.iconHash)
+    if (entry.coverHash) hashes.add(entry.coverHash)
+  }
+  return hashes
+}
 
 export async function exportBackup(window: BrowserWindow): Promise<void> {
   const result = await dialog.showSaveDialog(window, {
@@ -10,7 +28,18 @@ export async function exportBackup(window: BrowserWindow): Promise<void> {
   })
   if (result.canceled || !result.filePath) return
 
-  await writeFile(result.filePath, JSON.stringify(getStore().store, null, 2), 'utf-8')
+  const data = getStore().store
+  const icons: Record<string, string> = {}
+  for (const hash of collectReferencedHashes(data.entries)) {
+    try {
+      icons[hash] = (await readFile(iconFilePath(hash))).toString('base64')
+    } catch {
+      // Datei bereits weg (z. B. manuell gelöscht) — ohne Bild sichern statt abzubrechen.
+    }
+  }
+
+  const backup: BackupFile = { data, icons }
+  await writeFile(result.filePath, JSON.stringify(backup), 'utf-8')
   dialog.showMessageBox(window, {
     type: 'info',
     message: 'Daten wurden gesichert.',
@@ -29,10 +58,15 @@ export async function importBackup(window: BrowserWindow): Promise<Entry[] | nul
   })
   if (result.canceled || result.filePaths.length === 0) return null
 
-  let data
+  let parsed: BackupFile
   try {
     const raw = JSON.parse(await readFile(result.filePaths[0], 'utf-8'))
-    data = parseStoreData(raw)
+    // Sicherungen von vor der Bild-Mitsicherung haben die Store-Daten direkt
+    // auf oberster Ebene, ohne "data"/"icons"-Hülle — beides bleibt lesbar.
+    const isWrapped = raw && typeof raw === 'object' && 'data' in raw && 'icons' in raw
+    const data = parseStoreData(isWrapped ? raw.data : raw)
+    const icons = isWrapped && raw.icons && typeof raw.icons === 'object' ? raw.icons : {}
+    parsed = { data, icons }
   } catch (error) {
     dialog.showErrorBox(
       'Datei ungültig',
@@ -55,6 +89,15 @@ export async function importBackup(window: BrowserWindow): Promise<Entry[] | nul
   })
   if (confirmed.response !== 1) return null
 
-  replaceStoreData(data)
-  return data.entries
+  for (const [hash, base64] of Object.entries(parsed.icons)) {
+    if (typeof base64 !== 'string') continue
+    try {
+      await writeFile(iconFilePath(hash), Buffer.from(base64, 'base64'))
+    } catch {
+      // Cache-Ordner nicht schreibbar o. Ä. — das eine Bild fehlt dann einfach.
+    }
+  }
+
+  replaceStoreData(parsed.data)
+  return parsed.data.entries
 }
