@@ -1,4 +1,4 @@
-import type { Entry, Tag } from '../main/store'
+import type { Entry, Session, Tag } from '../main/store'
 import type { Candidate } from '../main/scanner'
 import type { EntryStats, OverviewData } from '../main/stats'
 import type { UpdaterStatus } from '../main/updater'
@@ -29,6 +29,7 @@ export interface LauncherApi {
 
   listStats: () => Promise<EntryStats[]>
   getOverview: () => Promise<OverviewData>
+  getEntrySessions: (id: string) => Promise<Session[]>
 
   onUpdaterStatus: (callback: (status: UpdaterStatus) => void) => () => void
   installUpdate: () => Promise<void>

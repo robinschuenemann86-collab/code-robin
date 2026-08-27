@@ -45,6 +45,7 @@ function App(): ReactElement {
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedTagId, setSelectedTagId] = useState<string | null>(null)
   const [favoritesOnly, setFavoritesOnly] = useState(false)
+  const [missingOnly, setMissingOnly] = useState(false)
   const [viewMode, setViewMode] = useState<ViewMode>('grid')
   const [sortMode, setSortMode] = useState<SortMode>('added')
   const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null)
@@ -126,6 +127,7 @@ function App(): ReactElement {
 
     const filtered = entries.filter((entry) => {
       if (favoritesOnly && !entry.favorite) return false
+      if (missingOnly && !missingPaths.has(entry.id)) return false
       if (selectedTagId === '' && entry.tags.length > 0) return false
       if (selectedTagId && selectedTagId !== '' && !entry.tags.includes(selectedTagId))
         return false
@@ -153,7 +155,7 @@ function App(): ReactElement {
           return b.addedAt - a.addedAt
       }
     })
-  }, [entries, searchQuery, selectedTagId, favoritesOnly, sortMode, stats])
+  }, [entries, searchQuery, selectedTagId, favoritesOnly, missingOnly, missingPaths, sortMode, stats])
 
   const selectedEntry = entries.find((e) => e.id === selectedEntryId) ?? null
 
@@ -340,6 +342,8 @@ function App(): ReactElement {
   function resetFilters(): void {
     setSearchQuery('')
     setSelectedTagId(null)
+    setFavoritesOnly(false)
+    setMissingOnly(false)
   }
 
   if (bigPictureMode) {
@@ -445,6 +449,9 @@ function App(): ReactElement {
           onViewModeChange={setViewMode}
           favoritesOnly={favoritesOnly}
           onFavoritesOnlyChange={setFavoritesOnly}
+          missingCount={missingPaths.size}
+          missingOnly={missingOnly}
+          onMissingOnlyChange={setMissingOnly}
           sortMode={sortMode}
           onSortModeChange={setSortMode}
           onAddTag={handleAddTag}

@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactElement } from 'react'
 import type { Entry, EntryStats, Tag } from '../types'
+import type { Session } from '../../../main/store'
 import { EntryIcon } from './EntryIcon'
 import {
   IconAlertTriangle,
@@ -61,11 +62,16 @@ export function DetailPanel({
   const [editingName, setEditingName] = useState(false)
   const [name, setName] = useState(entry.name)
   const [size, setSize] = useState<number | null | 'loading'>('loading')
+  const [sessions, setSessions] = useState<Session[]>([])
 
   useEffect(() => {
     setSize('loading')
     window.api.getEntrySize(entry.id).then(setSize)
   }, [entry.id])
+
+  useEffect(() => {
+    window.api.getEntrySessions(entry.id).then(setSessions)
+  }, [entry.id, stats])
 
   function commitName(): void {
     const trimmed = name.trim()
@@ -199,6 +205,25 @@ export function DetailPanel({
           {formatDuration(stats.totalPlayedMs)} · {stats.launchCount}× gestartet
           {stats.lastPlayedAt &&
             ` · zuletzt ${new Date(stats.lastPlayedAt).toLocaleDateString('de-DE')}`}
+        </div>
+      )}
+
+      {sessions.length > 0 && (
+        <div className="flex flex-col gap-1.5">
+          <span className="font-display text-[11px] font-bold tracking-wider text-text-muted">
+            SITZUNGEN
+          </span>
+          <div className="flex max-h-32 flex-col gap-1 overflow-y-auto pr-1">
+            {sessions.map((session) => (
+              <div
+                key={session.id}
+                className="flex items-center justify-between text-xs text-text-muted"
+              >
+                <span>{new Date(session.startedAt).toLocaleDateString('de-DE')}</span>
+                <span>{formatDuration((session.endedAt ?? session.startedAt) - session.startedAt)}</span>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 

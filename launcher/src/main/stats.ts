@@ -1,5 +1,5 @@
 import { ipcMain } from 'electron'
-import { getStore } from './store'
+import { getStore, type Session } from './store'
 
 export interface EntryStats {
   entryId: string
@@ -119,7 +119,20 @@ export function getMostRecentlyPlayedEntryId(): string | null {
   return withLastPlayed.reduce((a, b) => (b.lastPlayedAt > a.lastPlayedAt ? b : a)).entryId
 }
 
+// Für die Sitzungshistorie im Detail-Panel — bislang gab es dafür nur
+// Aggregate (Gesamtspielzeit, Anzahl Starts) oder eine globale, spielübergreifende
+// Liste, aber keine Sitzung-für-Sitzung-Ansicht für ein einzelnes Programm.
+function getSessionsForEntry(entryId: string): Session[] {
+  return getStore()
+    .get('sessions')
+    .filter((session) => session.entryId === entryId && session.endedAt !== null)
+    .sort((a, b) => b.startedAt - a.startedAt)
+}
+
 export function registerStatsHandlers(): void {
   ipcMain.handle('stats:list', () => computeStats())
   ipcMain.handle('stats:overview', () => computeOverview())
+  ipcMain.handle('stats:sessionsForEntry', (_event, entryId: string) =>
+    getSessionsForEntry(entryId)
+  )
 }

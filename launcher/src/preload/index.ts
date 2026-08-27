@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { Entry, Tag } from '../main/store'
+import type { Entry, Session, Tag } from '../main/store'
 import type { Candidate } from '../main/scanner'
 import type { EntryStats, OverviewData } from '../main/stats'
 import type { UpdaterStatus } from '../main/updater'
@@ -43,6 +43,8 @@ const api = {
 
   listStats: (): Promise<EntryStats[]> => ipcRenderer.invoke('stats:list'),
   getOverview: (): Promise<OverviewData> => ipcRenderer.invoke('stats:overview'),
+  getEntrySessions: (id: string): Promise<Session[]> =>
+    ipcRenderer.invoke('stats:sessionsForEntry', id),
 
   onUpdaterStatus: (callback: (status: UpdaterStatus) => void): (() => void) => {
     const listener = (_event: unknown, status: UpdaterStatus): void => callback(status)

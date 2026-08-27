@@ -1,6 +1,15 @@
 import { useState, type ReactElement } from 'react'
 import type { Entry, SortMode, Tag, ViewMode } from '../types'
-import { IconEdit, IconGrid, IconList, IconPlus, IconSearch, IconStar, IconTrash } from './icons'
+import {
+  IconAlertTriangle,
+  IconEdit,
+  IconGrid,
+  IconList,
+  IconPlus,
+  IconSearch,
+  IconStar,
+  IconTrash
+} from './icons'
 
 interface SidebarProps {
   tags: Tag[]
@@ -13,6 +22,9 @@ interface SidebarProps {
   onViewModeChange: (mode: ViewMode) => void
   favoritesOnly: boolean
   onFavoritesOnlyChange: (value: boolean) => void
+  missingCount: number
+  missingOnly: boolean
+  onMissingOnlyChange: (value: boolean) => void
   sortMode: SortMode
   onSortModeChange: (mode: SortMode) => void
   onAddTag: (name: string) => void
@@ -35,6 +47,9 @@ export function Sidebar({
   onViewModeChange,
   favoritesOnly,
   onFavoritesOnlyChange,
+  missingCount,
+  missingOnly,
+  onMissingOnlyChange,
   sortMode,
   onSortModeChange,
   onAddTag,
@@ -140,6 +155,19 @@ export function Sidebar({
         >
           Unsortiert <span className="text-text-muted">({untaggedCount})</span>
         </button>
+        {missingCount > 0 && (
+          <button
+            onClick={() => onMissingOnlyChange(!missingOnly)}
+            className={`flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-left text-sm transition ${
+              missingOnly
+                ? 'bg-panel-active text-amber'
+                : 'text-amber/80 hover:bg-panel-hover hover:text-amber'
+            }`}
+          >
+            <IconAlertTriangle className="h-3.5 w-3.5 shrink-0" />
+            Fehlende Pfade <span className="text-text-muted">({missingCount})</span>
+          </button>
+        )}
       </div>
 
       <div className="flex flex-1 flex-col gap-3 overflow-y-auto">
