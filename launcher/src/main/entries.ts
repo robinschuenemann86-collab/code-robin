@@ -57,6 +57,7 @@ async function addEntriesFromPaths(paths: string[]): Promise<Entry[]> {
       path: resolvedPath,
       iconHash,
       coverHash: null,
+      heroHash: null,
       tags: [],
       addedAt: Date.now(),
       steamAppId: null,
@@ -199,6 +200,11 @@ export async function removeEntry(id: string): Promise<Entry[]> {
     target.coverHash !== null && remaining.some((entry) => entry.coverHash === target.coverHash)
   if (target.coverHash && !coverStillUsed) {
     await removeCachedIcon(target.coverHash)
+  }
+  const heroStillUsed =
+    target.heroHash !== null && remaining.some((entry) => entry.heroHash === target.heroHash)
+  if (target.heroHash && !heroStillUsed) {
+    await removeCachedIcon(target.heroHash)
   }
 
   // Sonst sammeln sich Spielzeit-Sitzungen für längst entfernte Programme

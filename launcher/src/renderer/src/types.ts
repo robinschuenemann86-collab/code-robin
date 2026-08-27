@@ -4,6 +4,7 @@ export interface Entry {
   path: string
   iconHash: string | null
   coverHash: string | null
+  heroHash: string | null
   tags: string[]
   addedAt: number
   steamAppId: string | null

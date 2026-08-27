@@ -91,6 +91,13 @@ export function DetailPanel({
 
   return (
     <aside className="flex w-72 shrink-0 flex-col gap-4 border-l border-border bg-panel/40 p-5">
+      {entry.heroHash && (
+        <img
+          src={`launcher-icon://${entry.heroHash}`}
+          alt=""
+          className="-mx-5 -mt-5 mb-1 h-28 w-[calc(100%+2.5rem)] max-w-none object-cover"
+        />
+      )}
       <div className="flex items-center justify-between">
         <button
           onClick={() => onToggleFavorite(entry)}

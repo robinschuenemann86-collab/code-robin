@@ -12,6 +12,9 @@ const EntrySchema = z.object({
   // Große Boxart von SteamGridDB, unabhängig vom kleinen iconHash — siehe
   // coverArt.ts. Nicht gesetzt, solange niemand sie geladen hat.
   coverHash: z.string().nullable().default(null),
+  // Breites Hero-Banner von SteamGridDB (wie die Kopfgrafik einer Store-Seite),
+  // unabhängig vom Hochformat-coverHash — siehe coverArt.ts.
+  heroHash: z.string().nullable().default(null),
   tags: z.array(z.string()).default([]),
   addedAt: z.number(),
   // Nur gesetzt für per Scanner importierte Steam-Spiele. Diese werden über

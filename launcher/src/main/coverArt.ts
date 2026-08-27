@@ -15,6 +15,11 @@ interface SteamGridDbGridsResult {
   data?: { url: string }[]
 }
 
+interface SteamGridDbHeroesResult {
+  success: boolean
+  data?: { url: string }[]
+}
+
 export function getApiKey(): string | null {
   const value = getStore().get('settings').steamGridDbApiKey
   return typeof value === 'string' && value.trim() ? value.trim() : null
@@ -51,10 +56,24 @@ async function fetchGridUrl(gameId: number, apiKey: string): Promise<string | nu
   return body.data?.[0]?.url ?? null
 }
 
+// Breites Kopfbild (wie die Hero-Grafik einer Store-Seite) — anders als das
+// Grid-Cover nicht für jedes Spiel verfügbar, deshalb hier bewusst kein Fehler
+// bei einer leeren Antwort, nur null (siehe fetchCoverArt: optional).
+async function fetchHeroUrl(gameId: number, apiKey: string): Promise<string | null> {
+  const response = await fetch(`${API_BASE}/heroes/game/${gameId}?nsfw=false&humor=false`, {
+    headers: { Authorization: `Bearer ${apiKey}` }
+  })
+  if (!response.ok) {
+    throw new Error(`SteamGridDB antwortete mit Fehler ${response.status}.`)
+  }
+  const body = (await response.json()) as SteamGridDbHeroesResult
+  return body.data?.[0]?.url ?? null
+}
+
 // Neuer, bisher unbenutzter Hash statt eines pfadbasierten — sonst würde der
 // Renderer über den identischen launcher-icon://<hash>-Link weiter das alte
 // Bild aus dem Cache zeigen, obwohl dahinter eine neue Datei liegt.
-async function downloadAndCache(entryId: string, imageUrl: string): Promise<string> {
+async function downloadAndCache(entryId: string, imageUrl: string, kind: string): Promise<string> {
   const imageResponse = await fetch(imageUrl)
   if (!imageResponse.ok) {
     throw new Error('Bild konnte nicht heruntergeladen werden.')
@@ -64,7 +83,7 @@ async function downloadAndCache(entryId: string, imageUrl: string): Promise<stri
   if (image.isEmpty()) {
     throw new Error('Heruntergeladenes Bild war ungültig.')
   }
-  const hash = hashPath(`cover:${entryId}:${Date.now()}`)
+  const hash = hashPath(`${kind}:${entryId}:${Date.now()}`)
   await fs.writeFile(iconFilePath(hash), image.toPNG())
   return hash
 }
@@ -108,13 +127,24 @@ export async function fetchCoverArt(entryId: string): Promise<Entry[]> {
     throw new Error(`Für "${entry.name}" gibt es dort kein Cover-Bild.`)
   }
 
-  let newHash: string
+  let newCoverHash: string
   try {
-    newHash = await downloadAndCache(entryId, gridUrl)
+    newCoverHash = await downloadAndCache(entryId, gridUrl, 'cover')
   } catch (error) {
     throw new Error(
       `Cover-Bild konnte nicht geladen werden (${error instanceof Error ? error.message : String(error)}).`
     )
+  }
+
+  // Das breite Hero-Banner ist ein Extra, kein für alle Spiele verfügbares
+  // Pflichtbild wie das Grid-Cover — ein Fehlschlag hier lässt den Rest der
+  // Cover-Art-Suche nicht scheitern, heroHash bleibt dann einfach null.
+  let newHeroHash: string | null = null
+  try {
+    const heroUrl = await fetchHeroUrl(gameId, apiKey)
+    if (heroUrl) newHeroHash = await downloadAndCache(entryId, heroUrl, 'hero')
+  } catch {
+    // Kein Hero-Bild verfügbar oder Download fehlgeschlagen — ignorieren.
   }
 
   // Erst jetzt, nach den langsamen Netzwerk-Aufrufen, den aktuellsten Stand
@@ -122,13 +152,24 @@ export async function fetchCoverArt(entryId: string): Promise<Entry[]> {
   // angestoßene Abrufe gegenseitig (wer zuletzt fertig ist, gewinnt und
   // verwirft die Treffer aller anderen, obwohl die erfolgreich waren).
   const latest = getStore().get('entries')
-  const oldHash = latest.find((e) => e.id === entryId)?.coverHash ?? null
-  const updated = latest.map((e) => (e.id === entryId ? { ...e, coverHash: newHash } : e))
+  const oldCoverHash = latest.find((e) => e.id === entryId)?.coverHash ?? null
+  const oldHeroHash = latest.find((e) => e.id === entryId)?.heroHash ?? null
+  const updated = latest.map((e) =>
+    e.id === entryId
+      ? { ...e, coverHash: newCoverHash, heroHash: newHeroHash ?? e.heroHash }
+      : e
+  )
   setEntries(updated)
 
-  const oldHashStillUsed = oldHash !== null && updated.some((e) => e.coverHash === oldHash)
-  if (oldHash && !oldHashStillUsed) {
-    await removeCachedIcon(oldHash)
+  const oldCoverStillUsed =
+    oldCoverHash !== null && updated.some((e) => e.coverHash === oldCoverHash)
+  if (oldCoverHash && !oldCoverStillUsed) {
+    await removeCachedIcon(oldCoverHash)
+  }
+  const oldHeroStillUsed =
+    newHeroHash !== null && oldHeroHash !== null && updated.some((e) => e.heroHash === oldHeroHash)
+  if (newHeroHash && oldHeroHash && !oldHeroStillUsed) {
+    await removeCachedIcon(oldHeroHash)
   }
 
   return updated

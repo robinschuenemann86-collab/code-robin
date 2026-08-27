@@ -92,15 +92,35 @@ export function BigPictureView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [entries, selectedIndex])
 
+  const selectedEntry = entries[selectedIndex] as Entry | undefined
+
   return (
     <div
-      className="fixed inset-0 z-50 flex flex-col p-10 text-text"
+      className="fixed inset-0 z-50 flex flex-col overflow-hidden p-10 text-text"
       style={{
         background:
           'radial-gradient(120% 90% at 50% 0%, color-mix(in srgb, var(--color-ember) 20%, var(--color-base)) 0%, color-mix(in srgb, var(--color-ember) 6%, var(--color-base)) 45%, var(--color-base) 100%)'
       }}
     >
-      <div className="mb-8 flex items-center gap-3">
+      {/* Hero-Banner des fokussierten Spiels als Hintergrund, wie auf einer
+          Store-Seite — nur ein Extra, viele Einträge haben keins. */}
+      {selectedEntry?.heroHash && (
+        <img
+          key={selectedEntry.heroHash}
+          src={`launcher-icon://${selectedEntry.heroHash}`}
+          alt=""
+          className="absolute inset-0 h-full w-full object-cover opacity-30"
+        />
+      )}
+      <div
+        className="absolute inset-0"
+        style={{
+          background:
+            'linear-gradient(180deg, color-mix(in srgb, var(--color-base) 55%, transparent) 0%, var(--color-base) 85%)'
+        }}
+      />
+
+      <div className="relative z-10 mb-8 flex items-center gap-3">
         <img src={logo} alt="" className="h-10 w-10 rounded-md object-cover" />
         <h1 className="ember-grad-text font-display text-xl font-extrabold uppercase tracking-tight">
           MR Launch
@@ -109,10 +129,10 @@ export function BigPictureView({
       </div>
 
       {entries.length === 0 ? (
-        <p className="text-text-muted">Keine Programme in dieser Ansicht.</p>
+        <p className="relative z-10 text-text-muted">Keine Programme in dieser Ansicht.</p>
       ) : (
         <div
-          className="grid flex-1 content-start gap-6 overflow-y-auto"
+          className="relative z-10 grid flex-1 content-start gap-6 overflow-y-auto"
           style={{ gridTemplateColumns: `repeat(${COLUMNS}, minmax(0, 1fr))` }}
         >
           {entries.map((entry, index) => (

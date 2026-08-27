@@ -466,6 +466,7 @@ async function importCandidates(candidates: Candidate[]): Promise<Entry[]> {
       path: candidate.path,
       iconHash: candidate.iconHash,
       coverHash: null,
+      heroHash: null,
       tags: [],
       addedAt: Date.now(),
       steamAppId: candidate.steamAppId,
