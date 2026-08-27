@@ -134,6 +134,11 @@ function App(): ReactElement {
     }
   }, [overviewOpen])
 
+  async function handleSetWeeklyGoal(minutes: number | null): Promise<void> {
+    await window.api.setWeeklyGoal(minutes)
+    setOverview(await window.api.getOverview())
+  }
+
   const filteredEntries = useMemo(() => {
     const query = searchQuery.trim().toLowerCase()
     const statsByEntry = new Map(stats.map((s) => [s.entryId, s]))
@@ -798,6 +803,7 @@ function App(): ReactElement {
           entries={entries}
           stats={stats}
           overview={overview}
+          onSetGoal={handleSetWeeklyGoal}
           onClose={() => setOverviewOpen(false)}
         />
       )}

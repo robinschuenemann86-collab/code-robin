@@ -1,5 +1,5 @@
 import { ipcMain } from 'electron'
-import { getStore, type Session } from './store'
+import { getStore, setSettings, type Session } from './store'
 
 export interface EntryStats {
   entryId: string
@@ -41,6 +41,17 @@ export interface OverviewData {
   playedThisWeekMs: number
   totalLaunches: number
   recentSessions: { entryId: string; endedAt: number; durationMs: number }[]
+  // Selbst gesetztes Wochenziel in Minuten, null wenn keins gesetzt ist.
+  weeklyGoalMinutes: number | null
+}
+
+export function getWeeklyGoalMinutes(): number | null {
+  const value = getStore().get('settings').weeklyGoalMinutes
+  return typeof value === 'number' && value > 0 ? value : null
+}
+
+export function setWeeklyGoalMinutes(minutes: number | null): void {
+  setSettings({ ...getStore().get('settings'), weeklyGoalMinutes: minutes })
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000
@@ -104,7 +115,8 @@ function computeOverview(): OverviewData {
     weekActivity,
     playedThisWeekMs,
     totalLaunches,
-    recentSessions: recentSessions.slice(0, 6)
+    recentSessions: recentSessions.slice(0, 6),
+    weeklyGoalMinutes: getWeeklyGoalMinutes()
   }
 }
 
@@ -146,4 +158,7 @@ export function registerStatsHandlers(): void {
     getSessionsForEntry(entryId)
   )
   ipcMain.handle('stats:runningEntries', () => getRunningEntryIds())
+  ipcMain.handle('stats:setWeeklyGoal', (_event, minutes: number | null) =>
+    setWeeklyGoalMinutes(minutes)
+  )
 }

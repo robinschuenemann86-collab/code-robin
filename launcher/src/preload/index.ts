@@ -48,6 +48,8 @@ const api = {
   getEntrySessions: (id: string): Promise<Session[]> =>
     ipcRenderer.invoke('stats:sessionsForEntry', id),
   getRunningEntries: (): Promise<string[]> => ipcRenderer.invoke('stats:runningEntries'),
+  setWeeklyGoal: (minutes: number | null): Promise<void> =>
+    ipcRenderer.invoke('stats:setWeeklyGoal', minutes),
 
   onUpdaterStatus: (callback: (status: UpdaterStatus) => void): (() => void) => {
     const listener = (_event: unknown, status: UpdaterStatus): void => callback(status)

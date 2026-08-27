@@ -1,4 +1,4 @@
-import { ipcMain, nativeImage } from 'electron'
+import { ipcMain, nativeImage, type BrowserWindow } from 'electron'
 import { promises as fs } from 'fs'
 import { getStore, setEntries, setSettings, type Entry } from './store'
 import { hashPath, iconFilePath, removeCachedIcon } from './icons'
@@ -151,6 +151,44 @@ export async function fetchCoverArtForNewEntries(
       // Nachladen einfach überspringen statt eine Fehlermeldung zu zeigen.
     }
   }
+}
+
+// Für Bibliotheken, die schon vor der automatischen Cover-Art existierten —
+// holt sie rückwirkend für alle Einträge nach, die noch keine haben, statt
+// dass man jedes einzeln über das Kontextmenü anstoßen muss.
+export async function fetchMissingCoverArtForAll(window: BrowserWindow): Promise<void> {
+  if (!getApiKey()) {
+    window.webContents.send(
+      'status:message',
+      'Kein SteamGridDB-Key hinterlegt. Über "…" → "SteamGridDB-Key…" eintragen.'
+    )
+    return
+  }
+
+  const missing = getStore()
+    .get('entries')
+    .filter((entry) => !entry.coverHash)
+  if (missing.length === 0) {
+    window.webContents.send('status:message', 'Alle Programme haben bereits Cover-Art.')
+    return
+  }
+
+  window.webContents.send('status:message', `Suche Cover-Art für ${missing.length} Programme …`)
+  const beforeHashes = new Map(missing.map((entry) => [entry.id, entry.coverHash]))
+
+  await fetchCoverArtForNewEntries(
+    missing.map((entry) => entry.id),
+    (entries) => window.webContents.send('entries:changed', entries)
+  )
+
+  const found = getStore()
+    .get('entries')
+    .filter((entry) => beforeHashes.has(entry.id) && entry.coverHash !== beforeHashes.get(entry.id))
+    .length
+  window.webContents.send(
+    'status:message',
+    `Cover-Art für ${found} von ${missing.length} Programmen gefunden.`
+  )
 }
 
 export function registerCoverArtHandlers(): void {

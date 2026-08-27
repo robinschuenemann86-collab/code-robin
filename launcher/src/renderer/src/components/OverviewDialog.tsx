@@ -1,13 +1,14 @@
-import { useMemo, type ReactElement } from 'react'
+import { useMemo, useState, type ReactElement } from 'react'
 import type { Entry, EntryStats, OverviewData } from '../types'
 import { EntryIcon } from './EntryIcon'
-import { IconX } from './icons'
+import { IconEdit, IconX } from './icons'
 import { useEscapeToClose } from '../hooks'
 
 interface OverviewDialogProps {
   entries: Entry[]
   stats: EntryStats[]
   overview: OverviewData
+  onSetGoal: (minutes: number | null) => void
   onClose: () => void
 }
 
@@ -38,12 +39,23 @@ export function OverviewDialog({
   entries,
   stats,
   overview,
+  onSetGoal,
   onClose
 }: OverviewDialogProps): ReactElement {
   useEscapeToClose(onClose)
+  const [editingGoal, setEditingGoal] = useState(false)
+  const [goalHours, setGoalHours] = useState(
+    overview.weeklyGoalMinutes ? String(overview.weeklyGoalMinutes / 60) : ''
+  )
   const thisWeek = overview.weekActivity.slice(21, 28)
   const daysActive = thisWeek.filter((d) => d === true).length
   const ringOffset = RING_CIRCUMFERENCE * (1 - daysActive / 7)
+
+  function commitGoal(): void {
+    const hours = parseFloat(goalHours.replace(',', '.'))
+    onSetGoal(Number.isFinite(hours) && hours > 0 ? Math.round(hours * 60) : null)
+    setEditingGoal(false)
+  }
 
   const mostPlayed = useMemo(() => {
     const top = [...stats].sort((a, b) => b.totalPlayedMs - a.totalPlayedMs)[0]
@@ -98,13 +110,62 @@ export function OverviewDialog({
                 <span className="text-[10px] font-semibold text-text-muted">Tage aktiv</span>
               </div>
             </div>
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-1 flex-col gap-2">
               <div className="text-lg font-bold">{formatDuration(overview.playedThisWeekMs)} diese Woche</div>
               <p className="max-w-[220px] text-sm text-text-muted">
                 {daysActive === 0
                   ? 'Diese Woche noch nichts gestartet.'
                   : `An ${daysActive} von 7 Tagen war was los.`}
               </p>
+
+              {editingGoal ? (
+                <div className="flex items-center gap-1.5">
+                  <input
+                    autoFocus
+                    type="number"
+                    min="0"
+                    step="0.5"
+                    value={goalHours}
+                    onChange={(e) => setGoalHours(e.target.value)}
+                    onBlur={commitGoal}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') commitGoal()
+                      if (e.key === 'Escape') setEditingGoal(false)
+                    }}
+                    placeholder="Std."
+                    className="w-16 rounded-lg border border-border bg-panel-hover px-2 py-1 text-sm text-text outline-none focus:border-gold/50"
+                  />
+                  <span className="text-xs text-text-muted">Std./Woche</span>
+                </div>
+              ) : overview.weeklyGoalMinutes ? (
+                <button
+                  onClick={() => {
+                    setGoalHours(String(overview.weeklyGoalMinutes! / 60))
+                    setEditingGoal(true)
+                  }}
+                  className="group flex flex-col gap-1 text-left"
+                >
+                  <span className="h-1.5 w-full max-w-[220px] overflow-hidden rounded-full bg-panel-active">
+                    <span
+                      className="ember-grad-bg block h-full rounded-full"
+                      style={{
+                        width: `${Math.min(100, (overview.playedThisWeekMs / (overview.weeklyGoalMinutes * 60_000)) * 100)}%`
+                      }}
+                    />
+                  </span>
+                  <span className="flex items-center gap-1 text-xs text-text-muted group-hover:text-gold">
+                    Ziel: {overview.weeklyGoalMinutes / 60} Std./Woche
+                    <IconEdit className="h-3 w-3" />
+                  </span>
+                </button>
+              ) : (
+                <button
+                  onClick={() => setEditingGoal(true)}
+                  className="text-left text-xs font-semibold text-gold hover:brightness-125"
+                >
+                  + Wochenziel setzen
+                </button>
+              )}
             </div>
           </div>
 

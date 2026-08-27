@@ -1,5 +1,6 @@
 import { app, ipcMain, Menu, type BrowserWindow } from 'electron'
 import { exportBackup, importBackup } from './backup'
+import { fetchMissingCoverArtForAll } from './coverArt'
 
 export function registerAppMenuHandlers(getWindow: () => BrowserWindow | null): void {
   ipcMain.on('appMenu:show', () => {
@@ -26,6 +27,10 @@ export function registerAppMenuHandlers(getWindow: () => BrowserWindow | null): 
       {
         label: 'SteamGridDB-Key…',
         click: () => window.webContents.send('coverArt:openKeyDialog')
+      },
+      {
+        label: 'Fehlende Cover-Art nachladen',
+        click: () => void fetchMissingCoverArtForAll(window)
       }
     ])
     menu.popup({ window })

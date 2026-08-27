@@ -50,4 +50,5 @@ export interface OverviewData {
   playedThisWeekMs: number
   totalLaunches: number
   recentSessions: { entryId: string; endedAt: number; durationMs: number }[]
+  weeklyGoalMinutes: number | null
 }
