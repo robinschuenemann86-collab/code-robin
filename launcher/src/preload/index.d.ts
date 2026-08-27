@@ -1,4 +1,4 @@
-import type { Entry, Session, Tag } from '../main/store'
+import type { Entry, SavedView, Session, Tag } from '../main/store'
 import type { Candidate } from '../main/scanner'
 import type { EntryStats, OverviewData } from '../main/stats'
 import type { UpdaterStatus } from '../main/updater'
@@ -24,6 +24,11 @@ export interface LauncherApi {
   addTag: (name: string) => Promise<Tag[]>
   renameTag: (id: string, name: string) => Promise<Tag[]>
   removeTag: (id: string) => Promise<Tag[]>
+  cycleTagColor: (id: string, palette: string[]) => Promise<Tag[]>
+
+  listSavedViews: () => Promise<SavedView[]>
+  addSavedView: (view: Omit<SavedView, 'id'>) => Promise<SavedView[]>
+  removeSavedView: (id: string) => Promise<SavedView[]>
 
   scan: () => Promise<Candidate[]>
   importCandidates: (candidates: Candidate[]) => Promise<Entry[]>

@@ -38,7 +38,11 @@ const EntrySchema = z.object({
 
 const TagSchema = z.object({
   id: z.string(),
-  name: z.string().min(1)
+  name: z.string().min(1),
+  // Feste Wahl statt Freitext-Farbe, damit es zur kuratierten Palette passt
+  // (siehe DOT_COLORS in Sidebar.tsx). null = automatisch nach Position
+  // durchrotieren, wie bisher.
+  color: z.string().nullable().default(null)
 })
 
 const SessionSchema = z.object({
@@ -48,17 +52,31 @@ const SessionSchema = z.object({
   endedAt: z.number().nullable()
 })
 
+// Eine gespeicherte Kombination aus Tag-Filter, Sortierung und Suchtext, die
+// man mit einem Klick wieder anwenden kann, statt sie jedes Mal neu zu setzen
+// (nach dem Vorbild von GOG Galaxys anpassbaren Bibliotheks-Ansichten).
+const SavedViewSchema = z.object({
+  id: z.string(),
+  name: z.string().min(1),
+  selectedTagId: z.string().nullable(),
+  sortMode: z.enum(['name', 'recent', 'playtime', 'added', 'custom']),
+  searchQuery: z.string(),
+  favoritesOnly: z.boolean()
+})
+
 const StoreDataSchema = z.object({
   version: z.literal(2),
   entries: z.array(EntrySchema),
   tags: z.array(TagSchema),
   sessions: z.array(SessionSchema),
-  settings: z.record(z.string(), z.unknown())
+  settings: z.record(z.string(), z.unknown()),
+  savedViews: z.array(SavedViewSchema).default([])
 })
 
 export type Entry = z.infer<typeof EntrySchema>
 export type Tag = z.infer<typeof TagSchema>
 export type Session = z.infer<typeof SessionSchema>
+export type SavedView = z.infer<typeof SavedViewSchema>
 export type StoreData = z.infer<typeof StoreDataSchema>
 
 const defaults: StoreData = {
@@ -66,7 +84,8 @@ const defaults: StoreData = {
   entries: [],
   tags: [],
   sessions: [],
-  settings: {}
+  settings: {},
+  savedViews: []
 }
 
 // Stand vor Tags: Einträge hatten ein einzelnes `category`-Feld, Kategorien
@@ -221,4 +240,13 @@ export function setSettings(settings: StoreData['settings']): void {
     throw new Error(`Ungültige Einstellungsdaten: ${parsed.error.message}`)
   }
   store.set('settings', settings)
+}
+
+export function setSavedViews(savedViews: SavedView[]): void {
+  const draft = { ...store.store, savedViews }
+  const parsed = StoreDataSchema.safeParse(draft)
+  if (!parsed.success) {
+    throw new Error(`Ungültige Ansichts-Daten: ${parsed.error.message}`)
+  }
+  store.set('savedViews', savedViews)
 }

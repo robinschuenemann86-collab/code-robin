@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type DragEvent, type ReactElement } from 'react'
-import type { Entry, EntryStats, OverviewData, SortMode, Tag, ViewMode } from './types'
+import type { Entry, EntryStats, OverviewData, SavedView, SortMode, Tag, ViewMode } from './types'
 import type { UpdaterStatus } from '../../main/updater'
+import { TAG_COLORS } from './constants'
 import { EntryIcon } from './components/EntryIcon'
 import { Sidebar } from './components/Sidebar'
 import { DetailPanel } from './components/DetailPanel'
@@ -54,6 +55,11 @@ function App(): ReactElement {
   const [draggedEntryId, setDraggedEntryId] = useState<string | null>(null)
   const [dragOverEntryId, setDragOverEntryId] = useState<string | null>(null)
   const [runningIds, setRunningIds] = useState<Set<string>>(new Set())
+  const [savedViews, setSavedViews] = useState<SavedView[]>([])
+
+  useEffect(() => {
+    window.api.listSavedViews().then(setSavedViews)
+  }, [])
 
   // Das Prozess-Polling im Main-Prozess läuft alle 15s (siehe playtime.ts) —
   // hier reicht ein ähnlich grobes Intervall, das "Läuft gerade"-Abzeichen
@@ -306,6 +312,27 @@ function App(): ReactElement {
     if (selectedTagId === id) setSelectedTagId(null)
   }
 
+  async function handleCycleTagColor(id: string): Promise<void> {
+    setTags(await window.api.cycleTagColor(id, TAG_COLORS))
+  }
+
+  async function handleSaveCurrentView(name: string): Promise<void> {
+    setSavedViews(
+      await window.api.addSavedView({ name, selectedTagId, sortMode, searchQuery, favoritesOnly })
+    )
+  }
+
+  function handleApplyView(view: SavedView): void {
+    setSelectedTagId(view.selectedTagId)
+    setSortMode(view.sortMode)
+    setSearchQuery(view.searchQuery)
+    setFavoritesOnly(view.favoritesOnly)
+  }
+
+  async function handleRemoveView(id: string): Promise<void> {
+    setSavedViews(await window.api.removeSavedView(id))
+  }
+
   // Pfeiltasten wandern durch die aktuell gefilterte Liste, Enter startet,
   // Entf/Rücktaste löscht — nur solange kein Eingabefeld fokussiert ist.
   useEffect(() => {
@@ -483,6 +510,11 @@ function App(): ReactElement {
           onAddTag={handleAddTag}
           onRenameTag={handleRenameTag}
           onRemoveTag={handleRemoveTag}
+          onCycleTagColor={handleCycleTagColor}
+          savedViews={savedViews}
+          onSaveCurrentView={handleSaveCurrentView}
+          onApplyView={handleApplyView}
+          onRemoveView={handleRemoveView}
         />
 
         <main

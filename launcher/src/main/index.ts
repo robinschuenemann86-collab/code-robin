@@ -16,6 +16,7 @@ import { registerContextMenuHandlers } from './contextMenu'
 import { registerAppMenuHandlers } from './appMenu'
 import { loadWindowBounds, saveWindowBounds } from './windowBounds'
 import { registerCoverArtHandlers } from './coverArt'
+import { registerSavedViewHandlers } from './savedViews'
 
 registerIconProtocolScheme()
 
@@ -126,6 +127,7 @@ app.whenReady().then(() => {
   registerContextMenuHandlers(() => mainWindow)
   registerAppMenuHandlers(() => mainWindow)
   registerCoverArtHandlers()
+  registerSavedViewHandlers()
 
   createWindow()
 

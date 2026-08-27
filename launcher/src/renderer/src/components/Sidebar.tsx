@@ -1,5 +1,6 @@
 import { useState, type ReactElement } from 'react'
-import type { Entry, SortMode, Tag, ViewMode } from '../types'
+import type { Entry, SavedView, SortMode, Tag, ViewMode } from '../types'
+import { TAG_COLORS } from '../constants'
 import {
   IconAlertTriangle,
   IconEdit,
@@ -8,7 +9,8 @@ import {
   IconPlus,
   IconSearch,
   IconStar,
-  IconTrash
+  IconTrash,
+  IconX
 } from './icons'
 
 interface SidebarProps {
@@ -30,11 +32,21 @@ interface SidebarProps {
   onAddTag: (name: string) => void
   onRenameTag: (id: string, name: string) => void
   onRemoveTag: (id: string) => void
+  onCycleTagColor: (id: string) => void
+  savedViews: SavedView[]
+  onSaveCurrentView: (name: string) => void
+  onApplyView: (view: SavedView) => void
+  onRemoveView: (id: string) => void
 }
 
-// Kleine, sich wiederholende Akzentfarben für die Tag-Punkte —
-// rein kosmetisch zur Wiedererkennung, keine feste Bedeutung pro Farbe.
-const DOT_COLORS = ['bg-gold', 'bg-ember', 'bg-rust', 'bg-amber']
+// Zeigt in der Farb-Wechsel-Schaltfläche einen Vorschau-Punkt der Farbe, auf
+// die ein Klick als Nächstes umschalten würde.
+const COLOR_PREVIEW: Record<string, string> = {
+  'bg-gold': 'var(--color-gold)',
+  'bg-ember': 'var(--color-ember)',
+  'bg-rust': 'var(--color-rust)',
+  'bg-amber': 'var(--color-amber)'
+}
 
 export function Sidebar({
   tags,
@@ -54,12 +66,19 @@ export function Sidebar({
   onSortModeChange,
   onAddTag,
   onRenameTag,
-  onRemoveTag
+  onRemoveTag,
+  onCycleTagColor,
+  savedViews,
+  onSaveCurrentView,
+  onApplyView,
+  onRemoveView
 }: SidebarProps): ReactElement {
   const [addingTag, setAddingTag] = useState(false)
   const [newTagName, setNewTagName] = useState('')
   const [editingTagId, setEditingTagId] = useState<string | null>(null)
   const [editingTagName, setEditingTagName] = useState('')
+  const [addingView, setAddingView] = useState(false)
+  const [newViewName, setNewViewName] = useState('')
 
   const untaggedCount = entries.filter((e) => e.tags.length === 0).length
 
@@ -75,6 +94,13 @@ export function Sidebar({
     const trimmed = editingTagName.trim()
     if (trimmed) onRenameTag(editingTagId, trimmed)
     setEditingTagId(null)
+  }
+
+  function commitNewView(): void {
+    const trimmed = newViewName.trim()
+    if (trimmed) onSaveCurrentView(trimmed)
+    setNewViewName('')
+    setAddingView(false)
   }
 
   return (
@@ -170,6 +196,55 @@ export function Sidebar({
         )}
       </div>
 
+      <div className="flex flex-col gap-2">
+        <span className="font-display text-[11px] font-bold tracking-wider text-text-muted">
+          ANSICHTEN
+        </span>
+        <div className="flex flex-wrap gap-1.5">
+          {savedViews.map((view) => (
+            <div
+              key={view.id}
+              className="group flex items-center gap-1 rounded-full border border-border bg-panel px-3 py-1.5 text-xs font-semibold text-text-muted transition hover:border-gold/30 hover:text-text"
+            >
+              <button onClick={() => onApplyView(view)} className="truncate" title="Ansicht anwenden">
+                {view.name}
+              </button>
+              <button
+                onClick={() => onRemoveView(view.id)}
+                title="Ansicht löschen"
+                className="hidden p-0.5 group-hover:inline-flex group-focus-within:inline-flex"
+              >
+                <IconX className="h-3 w-3" />
+              </button>
+            </div>
+          ))}
+
+          {addingView ? (
+            <input
+              autoFocus
+              value={newViewName}
+              onChange={(e) => setNewViewName(e.target.value)}
+              onBlur={commitNewView}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') commitNewView()
+                if (e.key === 'Escape') setAddingView(false)
+              }}
+              placeholder="Name der Ansicht"
+              className="w-32 rounded-full border border-border bg-panel px-3 py-1.5 text-xs text-text outline-none focus:border-gold/50"
+            />
+          ) : (
+            <button
+              onClick={() => setAddingView(true)}
+              title="Aktuelle Filter (Tag, Sortierung, Suche, Favoriten) als Ansicht speichern"
+              className="flex items-center gap-1 rounded-full border border-dashed border-border px-3 py-1.5 text-xs font-semibold text-text-muted transition hover:border-gold/50 hover:text-gold"
+            >
+              <IconPlus className="h-3 w-3" />
+              Ansicht
+            </button>
+          )}
+        </div>
+      </div>
+
       <div className="flex flex-1 flex-col gap-3 overflow-y-auto">
         <span className="font-display text-[11px] font-bold tracking-wider text-text-muted">
           DEINE TAGS
@@ -178,7 +253,15 @@ export function Sidebar({
           {tags.map((tag, index) => {
             const count = entries.filter((e) => e.tags.includes(tag.id)).length
             const isEditing = editingTagId === tag.id
-            const color = DOT_COLORS[index % DOT_COLORS.length]
+            const color = tag.color ?? TAG_COLORS[index % TAG_COLORS.length]
+            // Muss exakt widerspiegeln, wozu ein Klick auf den Farb-Knopf als
+            // Nächstes führt (siehe cycleTagColor in tags.ts): nach der letzten
+            // Palettenfarbe geht es zurück auf "automatisch nach Position".
+            const currentColorIndex = tag.color ? TAG_COLORS.indexOf(tag.color) : -1
+            const nextIsAuto = currentColorIndex + 1 >= TAG_COLORS.length
+            const nextColorPreview = nextIsAuto
+              ? TAG_COLORS[index % TAG_COLORS.length]
+              : TAG_COLORS[currentColorIndex + 1]
             const active = selectedTagId === tag.id
 
             if (isEditing) {
@@ -218,6 +301,12 @@ export function Sidebar({
                 >
                   <IconEdit className="h-3 w-3" />
                 </button>
+                <button
+                  onClick={() => onCycleTagColor(tag.id)}
+                  title="Farbe wechseln"
+                  className="hidden h-3 w-3 shrink-0 rounded-full ring-1 ring-on-ember/50 group-hover:inline-flex group-focus-within:inline-flex"
+                  style={{ backgroundColor: COLOR_PREVIEW[nextColorPreview] }}
+                />
                 <button
                   onClick={() => onRemoveTag(tag.id)}
                   title="Löschen"

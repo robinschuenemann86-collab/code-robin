@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { Entry, Session, Tag } from '../main/store'
+import type { Entry, SavedView, Session, Tag } from '../main/store'
 import type { Candidate } from '../main/scanner'
 import type { EntryStats, OverviewData } from '../main/stats'
 import type { UpdaterStatus } from '../main/updater'
@@ -38,6 +38,14 @@ const api = {
   renameTag: (id: string, name: string): Promise<Tag[]> =>
     ipcRenderer.invoke('tags:rename', id, name),
   removeTag: (id: string): Promise<Tag[]> => ipcRenderer.invoke('tags:remove', id),
+  cycleTagColor: (id: string, palette: string[]): Promise<Tag[]> =>
+    ipcRenderer.invoke('tags:cycleColor', id, palette),
+
+  listSavedViews: (): Promise<SavedView[]> => ipcRenderer.invoke('savedViews:list'),
+  addSavedView: (view: Omit<SavedView, 'id'>): Promise<SavedView[]> =>
+    ipcRenderer.invoke('savedViews:add', view),
+  removeSavedView: (id: string): Promise<SavedView[]> =>
+    ipcRenderer.invoke('savedViews:remove', id),
 
   scan: (): Promise<Candidate[]> => ipcRenderer.invoke('scanner:scan'),
   importCandidates: (candidates: Candidate[]): Promise<Entry[]> =>

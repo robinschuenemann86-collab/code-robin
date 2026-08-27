@@ -17,11 +17,21 @@ export interface Entry {
 export interface Tag {
   id: string
   name: string
+  color: string | null
 }
 
 export type ViewMode = 'grid' | 'list'
 
 export type SortMode = 'name' | 'recent' | 'playtime' | 'added' | 'custom'
+
+export interface SavedView {
+  id: string
+  name: string
+  selectedTagId: string | null
+  sortMode: SortMode
+  searchQuery: string
+  favoritesOnly: boolean
+}
 
 export interface Candidate {
   key: string

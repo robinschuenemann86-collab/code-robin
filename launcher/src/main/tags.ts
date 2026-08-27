@@ -11,7 +11,25 @@ function addTag(name: string): Tag[] {
   if (tags.some((t) => t.name.toLowerCase() === trimmed.toLowerCase())) {
     throw new Error('Diesen Tag gibt es bereits.')
   }
-  const updated = [...tags, { id: randomUUID(), name: trimmed }]
+  const updated = [...tags, { id: randomUUID(), name: trimmed, color: null }]
+  setTags(updated)
+  return updated
+}
+
+// Zyklus statt freier Farbwahl, damit es zur kuratierten Palette passt (siehe
+// DOT_COLORS in Sidebar.tsx) — ein Klick springt zur nächsten Farbe, nach der
+// letzten zurück auf "automatisch" (null, nach Position durchrotiert).
+function cycleTagColor(id: string, palette: string[]): Tag[] {
+  const tags = getStore().get('tags')
+  const index = tags.findIndex((t) => t.id === id)
+  if (index === -1) {
+    throw new Error('Tag wurde nicht gefunden.')
+  }
+  const current = tags[index].color
+  const currentIndex = current ? palette.indexOf(current) : -1
+  const nextColor = currentIndex + 1 >= palette.length ? null : palette[currentIndex + 1]
+  const updated = [...tags]
+  updated[index] = { ...updated[index], color: nextColor }
   setTags(updated)
   return updated
 }
@@ -59,4 +77,7 @@ export function registerTagHandlers(): void {
   ipcMain.handle('tags:add', (_event, name: string) => addTag(name))
   ipcMain.handle('tags:rename', (_event, id: string, name: string) => renameTag(id, name))
   ipcMain.handle('tags:remove', (_event, id: string) => removeTag(id))
+  ipcMain.handle('tags:cycleColor', (_event, id: string, palette: string[]) =>
+    cycleTagColor(id, palette)
+  )
 }
