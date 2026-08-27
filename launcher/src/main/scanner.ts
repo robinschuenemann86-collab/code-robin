@@ -1,4 +1,4 @@
-import { ipcMain } from 'electron'
+import { ipcMain, type BrowserWindow } from 'electron'
 import { spawn } from 'child_process'
 import { randomUUID } from 'crypto'
 import { existsSync, readdirSync, readFileSync, statSync } from 'fs'
@@ -6,6 +6,7 @@ import { basename, join } from 'path'
 import { getStore, setEntries, nextOrder, type Entry } from './store'
 import { ensureIconCached, ensureSteamIconCached } from './icons'
 import { parseVdf } from './vdf'
+import { fetchCoverArtForNewEntries } from './coverArt'
 
 export interface Candidate {
   key: string
@@ -481,9 +482,17 @@ async function importCandidates(candidates: Candidate[]): Promise<Entry[]> {
   return updated
 }
 
-export function registerScannerHandlers(): void {
+export function registerScannerHandlers(getWindow: () => BrowserWindow | null): void {
   ipcMain.handle('scanner:scan', () => scan())
-  ipcMain.handle('scanner:import', (_event, candidates: Candidate[]) =>
-    importCandidates(candidates)
-  )
+  ipcMain.handle('scanner:import', async (_event, candidates: Candidate[]) => {
+    const before = new Set(getStore().get('entries').map((e) => e.id))
+    const updated = await importCandidates(candidates)
+    const newIds = updated.filter((e) => !before.has(e.id)).map((e) => e.id)
+    if (newIds.length > 0) {
+      void fetchCoverArtForNewEntries(newIds, (entries) =>
+        getWindow()?.webContents.send('entries:changed', entries)
+      )
+    }
+    return updated
+  })
 }

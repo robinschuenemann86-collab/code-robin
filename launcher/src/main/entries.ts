@@ -7,6 +7,7 @@ import { existsSync } from 'fs'
 import { getStore, setEntries, nextOrder, type Entry } from './store'
 import { ensureIconCached, removeCachedIcon, setCustomIcon } from './icons'
 import { startSession } from './playtime'
+import { fetchCoverArtForNewEntries } from './coverArt'
 
 function deriveName(targetPath: string): string {
   return basename(targetPath, extname(targetPath))
@@ -280,15 +281,34 @@ export function showEntryInExplorer(id: string): void {
   }
 }
 
+// Holt für neu hinzugefügte Einträge automatisch Cover-Art nach — läuft im
+// Hintergrund weiter, nachdem die IPC-Antwort mit den neuen Einträgen schon
+// beim Renderer angekommen ist, und schiebt jedes gefundene Bild einzeln per
+// entries:changed nach, statt auf alle Ergebnisse zu warten.
+function triggerCoverArtForNewEntries(
+  before: Set<string>,
+  updated: Entry[],
+  getWindow: () => BrowserWindow | null
+): void {
+  const newIds = updated.filter((e) => !before.has(e.id)).map((e) => e.id)
+  if (newIds.length === 0) return
+  void fetchCoverArtForNewEntries(newIds, (entries) =>
+    getWindow()?.webContents.send('entries:changed', entries)
+  )
+}
+
 export function registerEntryHandlers(getWindow: () => BrowserWindow | null): void {
   ipcMain.handle('entries:list', () => getStore().get('entries'))
 
-  ipcMain.handle('entries:addViaDialog', () => {
+  ipcMain.handle('entries:addViaDialog', async () => {
     const window = getWindow()
     if (!window) {
       throw new Error('Kein Fenster verfügbar.')
     }
-    return addEntryViaDialog(window)
+    const before = new Set(getStore().get('entries').map((e) => e.id))
+    const updated = await addEntryViaDialog(window)
+    triggerCoverArtForNewEntries(before, updated, getWindow)
+    return updated
   })
 
   ipcMain.handle('entries:rename', (_event, id: string, name: string) => renameEntry(id, name))
@@ -311,7 +331,12 @@ export function registerEntryHandlers(getWindow: () => BrowserWindow | null): vo
 
   ipcMain.handle('entries:getSize', (_event, id: string) => getEntrySize(id))
 
-  ipcMain.handle('entries:addPaths', (_event, paths: string[]) => addEntriesFromPaths(paths))
+  ipcMain.handle('entries:addPaths', async (_event, paths: string[]) => {
+    const before = new Set(getStore().get('entries').map((e) => e.id))
+    const updated = await addEntriesFromPaths(paths)
+    triggerCoverArtForNewEntries(before, updated, getWindow)
+    return updated
+  })
 
   ipcMain.on('entries:showInExplorer', (_event, id: string) => showEntryInExplorer(id))
 

@@ -102,7 +102,7 @@ app.whenReady().then(() => {
   closeDanglingSessions()
   registerEntryHandlers(() => mainWindow)
   registerTagHandlers()
-  registerScannerHandlers()
+  registerScannerHandlers(() => mainWindow)
   registerStatsHandlers()
   registerUpdaterHandlers(() => mainWindow)
   registerTray(() => mainWindow)

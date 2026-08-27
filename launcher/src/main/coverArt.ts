@@ -134,6 +134,25 @@ export async function fetchCoverArt(entryId: string): Promise<Entry[]> {
   return updated
 }
 
+// Läuft nach dem Hinzufügen neuer Einträge automatisch im Hintergrund, damit
+// nicht mehr für jedes Spiel einzeln "Cover-Art laden" geklickt werden muss.
+// Sequenziell statt parallel, um SteamGridDB nicht mit vielen gleichzeitigen
+// Anfragen auf einmal zu belasten (z. B. nach einem Scan mit vielen Treffern).
+export async function fetchCoverArtForNewEntries(
+  entryIds: string[],
+  onUpdate: (entries: Entry[]) => void
+): Promise<void> {
+  if (!getApiKey()) return
+  for (const entryId of entryIds) {
+    try {
+      onUpdate(await fetchCoverArt(entryId))
+    } catch {
+      // Kein Treffer, kein Netzwerk, ungültiger Key etc. — beim automatischen
+      // Nachladen einfach überspringen statt eine Fehlermeldung zu zeigen.
+    }
+  }
+}
+
 export function registerCoverArtHandlers(): void {
   ipcMain.handle('coverArt:get', () => getApiKey())
 

@@ -97,7 +97,17 @@ function App(): ReactElement {
   }, [entries])
 
   // Spielzeit läuft im Hintergrund weiter (Prozess-Polling im Main-Prozess),
-  // daher hier frisch nachladen statt die Werte vom App-Start zu behalten.
+  // daher hier frisch nachladen statt die Werte vom App-Start zu behalten. Der
+  // Fokus-Fall deckt "zuletzt gespielt": nach dem Beenden eines Spiels kommt
+  // man ins Fenster zurück, und die Leiste soll das dann schon zeigen.
+  useEffect(() => {
+    function refresh(): void {
+      window.api.listStats().then(setStats)
+    }
+    window.addEventListener('focus', refresh)
+    return () => window.removeEventListener('focus', refresh)
+  }, [])
+
   useEffect(() => {
     if (selectedEntryId || statsOpen) {
       window.api.listStats().then(setStats)
@@ -446,13 +456,17 @@ function App(): ReactElement {
                     key={entry.id}
                     onClick={() => setSelectedEntryId(entry.id)}
                     onDoubleClick={() => handleLaunch(entry)}
-                    className={`flex w-24 shrink-0 flex-col items-center gap-2 rounded-xl border p-3 text-center transition ${
+                    className={`flex w-28 shrink-0 flex-col items-center gap-2 rounded-xl border p-3 text-center transition ${
                       selectedEntryId === entry.id
                         ? 'glow-gold border-gold/60 bg-panel-active'
                         : 'border-border bg-panel hover:border-gold/30 hover:bg-panel-hover'
                     }`}
                   >
-                    <EntryIcon iconHash={entry.iconHash} />
+                    <EntryIcon
+                      iconHash={entry.iconHash}
+                      coverHash={entry.coverHash}
+                      className="aspect-[2/3] w-full"
+                    />
                     <span className="w-full truncate text-xs font-medium">{entry.name}</span>
                   </button>
                 ))}
