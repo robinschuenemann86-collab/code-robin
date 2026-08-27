@@ -53,6 +53,19 @@ function App(): ReactElement {
   const [missingPaths, setMissingPaths] = useState<Set<string>>(new Set())
   const [draggedEntryId, setDraggedEntryId] = useState<string | null>(null)
   const [dragOverEntryId, setDragOverEntryId] = useState<string | null>(null)
+  const [runningIds, setRunningIds] = useState<Set<string>>(new Set())
+
+  // Das Prozess-Polling im Main-Prozess läuft alle 15s (siehe playtime.ts) —
+  // hier reicht ein ähnlich grobes Intervall, das "Läuft gerade"-Abzeichen
+  // muss nicht sekundengenau sein.
+  useEffect(() => {
+    function refresh(): void {
+      window.api.getRunningEntries().then((ids) => setRunningIds(new Set(ids)))
+    }
+    refresh()
+    const interval = setInterval(refresh, 10_000)
+    return () => clearInterval(interval)
+  }, [])
 
   useEffect(() => {
     Promise.all([window.api.listEntries(), window.api.listTags(), window.api.listStats()]).then(
@@ -205,6 +218,9 @@ function App(): ReactElement {
     try {
       await window.api.launchEntry(entry.id)
       setStatus(`"${entry.name}" wurde gestartet.`)
+      // Sonst dauert es bis zu 10s (Poll-Intervall), bis das "Läuft
+      // gerade"-Abzeichen nach dem Start erscheint.
+      window.api.getRunningEntries().then((ids) => setRunningIds(new Set(ids)))
     } catch (error) {
       setStatus(`Fehler beim Starten: ${error instanceof Error ? error.message : String(error)}`)
     }
@@ -223,6 +239,10 @@ function App(): ReactElement {
 
   async function handleRename(id: string, name: string): Promise<void> {
     setEntries(await window.api.renameEntry(id, name))
+  }
+
+  async function handleSetLaunchArgs(id: string, args: string): Promise<void> {
+    setEntries(await window.api.setLaunchArgs(id, args))
   }
 
   async function handleChangeIcon(id: string): Promise<void> {
@@ -350,6 +370,7 @@ function App(): ReactElement {
     return (
       <BigPictureView
         entries={filteredEntries}
+        runningIds={runningIds}
         onLaunch={handleLaunch}
         onExit={() => window.api.setFullscreen(false)}
       />
@@ -604,6 +625,15 @@ function App(): ReactElement {
                         NEU
                       </span>
                     )}
+                    {runningIds.has(entry.id) && (
+                      <span
+                        title="Läuft gerade"
+                        className="absolute bottom-1.5 left-1.5 flex items-center gap-1 rounded-full bg-base/90 px-1.5 py-0.5 text-[9px] font-semibold leading-none text-emerald-400 ring-1 ring-emerald-400/50"
+                      >
+                        <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
+                        Läuft
+                      </span>
+                    )}
                   </div>
                   <span className="flex max-w-full items-center gap-1 truncate text-sm font-medium">
                     {missingPaths.has(entry.id) && (
@@ -666,6 +696,12 @@ function App(): ReactElement {
                       />
                     )}
                     <span className="truncate">{entry.name}</span>
+                    {runningIds.has(entry.id) && (
+                      <span
+                        title="Läuft gerade"
+                        className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-emerald-400"
+                      />
+                    )}
                     {isNewEntry(entry) && (
                       <span className="shrink-0 rounded-full ember-grad-bg px-1.5 py-0.5 text-[9px] font-semibold leading-none text-on-ember">
                         NEU
@@ -725,6 +761,7 @@ function App(): ReactElement {
             stats={stats.find((s) => s.entryId === selectedEntry.id) ?? null}
             onLaunch={handleLaunch}
             onRename={handleRename}
+            onSetLaunchArgs={handleSetLaunchArgs}
             onToggleTag={handleToggleTag}
             onChangeIcon={handleChangeIcon}
             onFetchCoverArt={handleFetchCoverArt}

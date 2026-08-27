@@ -7,6 +7,7 @@ export interface LauncherApi {
   listEntries: () => Promise<Entry[]>
   addEntryViaDialog: () => Promise<Entry[]>
   renameEntry: (id: string, name: string) => Promise<Entry[]>
+  setLaunchArgs: (id: string, args: string) => Promise<Entry[]>
   toggleEntryTag: (id: string, tagId: string) => Promise<Entry[]>
   removeEntry: (id: string) => Promise<Entry[]>
   moveEntry: (id: string, targetId: string | null, position: 'before' | 'after') => Promise<Entry[]>
@@ -30,6 +31,7 @@ export interface LauncherApi {
   listStats: () => Promise<EntryStats[]>
   getOverview: () => Promise<OverviewData>
   getEntrySessions: (id: string) => Promise<Session[]>
+  getRunningEntries: () => Promise<string[]>
 
   onUpdaterStatus: (callback: (status: UpdaterStatus) => void) => () => void
   installUpdate: () => Promise<void>

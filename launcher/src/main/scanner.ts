@@ -473,7 +473,8 @@ async function importCandidates(candidates: Candidate[]): Promise<Entry[]> {
       battlenetCode: candidate.battlenetCode,
       favorite: false,
       expectedProcessName: candidate.expectedProcessName,
-      order: (order += 1000)
+      order: (order += 1000),
+      launchArgs: null
     })
   }
 

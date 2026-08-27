@@ -6,8 +6,12 @@ export interface Entry {
   coverHash: string | null
   tags: string[]
   addedAt: number
+  steamAppId: string | null
+  epicAppName: string | null
+  battlenetCode: string | null
   favorite: boolean
   order: number
+  launchArgs: string | null
 }
 
 export interface Tag {

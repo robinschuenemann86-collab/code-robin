@@ -5,13 +5,19 @@ import logo from '../assets/logo.png'
 
 interface BigPictureViewProps {
   entries: Entry[]
+  runningIds: Set<string>
   onLaunch: (entry: Entry) => void
   onExit: () => void
 }
 
 const COLUMNS = 5
 
-export function BigPictureView({ entries, onLaunch, onExit }: BigPictureViewProps): ReactElement {
+export function BigPictureView({
+  entries,
+  runningIds,
+  onLaunch,
+  onExit
+}: BigPictureViewProps): ReactElement {
   const [selectedIndex, setSelectedIndex] = useState(0)
 
   useEffect(() => {
@@ -122,11 +128,19 @@ export function BigPictureView({ entries, onLaunch, onExit }: BigPictureViewProp
                   : 'border-border bg-panel'
               }`}
             >
-              <EntryIcon
-                iconHash={entry.iconHash}
-                coverHash={entry.coverHash}
-                className="aspect-[2/3] w-full"
-              />
+              <div className="relative w-full">
+                <EntryIcon
+                  iconHash={entry.iconHash}
+                  coverHash={entry.coverHash}
+                  className="aspect-[2/3] w-full"
+                />
+                {runningIds.has(entry.id) && (
+                  <span className="absolute bottom-1.5 left-1.5 flex items-center gap-1 rounded-full bg-base/90 px-1.5 py-0.5 text-[9px] font-semibold leading-none text-emerald-400 ring-1 ring-emerald-400/50">
+                    <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
+                    Läuft
+                  </span>
+                )}
+              </div>
               <span className="w-full truncate text-sm font-medium">{entry.name}</span>
             </button>
           ))}

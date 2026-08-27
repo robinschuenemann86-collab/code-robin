@@ -129,10 +129,21 @@ function getSessionsForEntry(entryId: string): Session[] {
     .sort((a, b) => b.startedAt - a.startedAt)
 }
 
+// Für das "Läuft gerade"-Abzeichen in der Bibliothek — eine offene Sitzung
+// (endedAt: null) bedeutet, dass das Prozess-Polling in playtime.ts das
+// Programm zuletzt noch laufend gesehen hat.
+function getRunningEntryIds(): string[] {
+  return getStore()
+    .get('sessions')
+    .filter((session) => session.endedAt === null)
+    .map((session) => session.entryId)
+}
+
 export function registerStatsHandlers(): void {
   ipcMain.handle('stats:list', () => computeStats())
   ipcMain.handle('stats:overview', () => computeOverview())
   ipcMain.handle('stats:sessionsForEntry', (_event, entryId: string) =>
     getSessionsForEntry(entryId)
   )
+  ipcMain.handle('stats:runningEntries', () => getRunningEntryIds())
 }

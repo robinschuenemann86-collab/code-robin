@@ -11,6 +11,8 @@ const api = {
   addEntryViaDialog: (): Promise<Entry[]> => ipcRenderer.invoke('entries:addViaDialog'),
   renameEntry: (id: string, name: string): Promise<Entry[]> =>
     ipcRenderer.invoke('entries:rename', id, name),
+  setLaunchArgs: (id: string, args: string): Promise<Entry[]> =>
+    ipcRenderer.invoke('entries:setLaunchArgs', id, args),
   toggleEntryTag: (id: string, tagId: string): Promise<Entry[]> =>
     ipcRenderer.invoke('entries:toggleTag', id, tagId),
   removeEntry: (id: string): Promise<Entry[]> => ipcRenderer.invoke('entries:remove', id),
@@ -45,6 +47,7 @@ const api = {
   getOverview: (): Promise<OverviewData> => ipcRenderer.invoke('stats:overview'),
   getEntrySessions: (id: string): Promise<Session[]> =>
     ipcRenderer.invoke('stats:sessionsForEntry', id),
+  getRunningEntries: (): Promise<string[]> => ipcRenderer.invoke('stats:runningEntries'),
 
   onUpdaterStatus: (callback: (status: UpdaterStatus) => void): (() => void) => {
     const listener = (_event: unknown, status: UpdaterStatus): void => callback(status)

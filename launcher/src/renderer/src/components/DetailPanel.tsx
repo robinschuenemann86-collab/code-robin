@@ -29,6 +29,7 @@ interface DetailPanelProps {
   stats: EntryStats | null
   onLaunch: (entry: Entry) => void
   onRename: (id: string, name: string) => void
+  onSetLaunchArgs: (id: string, args: string) => void
   onToggleTag: (id: string, tagId: string) => void
   onChangeIcon: (id: string) => void
   onFetchCoverArt: (id: string) => void
@@ -52,6 +53,7 @@ export function DetailPanel({
   stats,
   onLaunch,
   onRename,
+  onSetLaunchArgs,
   onToggleTag,
   onChangeIcon,
   onFetchCoverArt,
@@ -61,8 +63,10 @@ export function DetailPanel({
 }: DetailPanelProps): ReactElement {
   const [editingName, setEditingName] = useState(false)
   const [name, setName] = useState(entry.name)
+  const [launchArgs, setLaunchArgsValue] = useState(entry.launchArgs ?? '')
   const [size, setSize] = useState<number | null | 'loading'>('loading')
   const [sessions, setSessions] = useState<Session[]>([])
+  const canUseLaunchArgs = !entry.steamAppId && !entry.epicAppName && !entry.battlenetCode
 
   useEffect(() => {
     setSize('loading')
@@ -77,6 +81,12 @@ export function DetailPanel({
     const trimmed = name.trim()
     if (trimmed && trimmed !== entry.name) onRename(entry.id, trimmed)
     setEditingName(false)
+  }
+
+  function commitLaunchArgs(): void {
+    if (launchArgs.trim() !== (entry.launchArgs ?? '')) {
+      onSetLaunchArgs(entry.id, launchArgs)
+    }
   }
 
   return (
@@ -188,6 +198,25 @@ export function DetailPanel({
           {entry.path}
         </span>
       </div>
+
+      {canUseLaunchArgs && (
+        <div className="flex flex-col gap-1.5">
+          <span className="font-display text-[11px] font-bold tracking-wider text-text-muted">
+            START-PARAMETER
+          </span>
+          <input
+            value={launchArgs}
+            onChange={(e) => setLaunchArgsValue(e.target.value)}
+            onBlur={commitLaunchArgs}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') e.currentTarget.blur()
+              if (e.key === 'Escape') setLaunchArgsValue(entry.launchArgs ?? '')
+            }}
+            placeholder="z. B. -windowed -novid"
+            className="w-full rounded-lg border border-border bg-panel px-2 py-1.5 font-mono text-xs text-text outline-none focus:border-gold/50"
+          />
+        </div>
+      )}
 
       <div className="flex items-center gap-2 text-xs text-text-muted">
         <IconCalendar className="h-4 w-4 shrink-0" />

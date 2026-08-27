@@ -29,7 +29,11 @@ const EntrySchema = z.object({
   // Position für die manuelle Sortierung per Drag & Drop (siehe entries.ts
   // moveEntry). 0 bedeutet "noch nie zugewiesen" und wird beim ersten Start
   // nachträglich anhand von addedAt vergeben (siehe backfillOrder).
-  order: z.number().default(0)
+  order: z.number().default(0),
+  // Kommandozeilen-Parameter, die beim direkten Start (nicht bei Steam/Epic/
+  // Battle.net) an das Programm übergeben werden. Als Text statt Array
+  // gespeichert, weil der Nutzer sie so eintippt — siehe entries.ts parseArgs.
+  launchArgs: z.string().nullable().default(null)
 })
 
 const TagSchema = z.object({

@@ -64,7 +64,8 @@ async function addEntriesFromPaths(paths: string[]): Promise<Entry[]> {
       battlenetCode: null,
       favorite: false,
       expectedProcessName: basename(resolvedPath),
-      order: (order += 1000)
+      order: (order += 1000),
+      launchArgs: null
     })
     existingPaths.add(pathKey(resolvedPath))
   }
@@ -103,6 +104,19 @@ function renameEntry(id: string, name: string): Entry[] {
   }
   const updated = [...entries]
   updated[index] = { ...updated[index], name: trimmed }
+  setEntries(updated)
+  return updated
+}
+
+function setLaunchArgs(id: string, args: string): Entry[] {
+  const entries = getStore().get('entries')
+  const index = entries.findIndex((entry) => entry.id === id)
+  if (index === -1) {
+    throw new Error('Eintrag wurde nicht gefunden.')
+  }
+  const trimmed = args.trim()
+  const updated = [...entries]
+  updated[index] = { ...updated[index], launchArgs: trimmed || null }
   setEntries(updated)
   return updated
 }
@@ -216,10 +230,21 @@ export async function launchEntry(id: string): Promise<void> {
   } else if (entry.battlenetCode) {
     await shell.openExternal(`battlenet://${entry.battlenetCode}`)
   } else {
-    await spawnDetached(entry.path, dirname(entry.path))
+    await spawnDetached(entry.path, dirname(entry.path), parseArgs(entry.launchArgs))
   }
 
   startSession(entry.id, entry.expectedProcessName)
+}
+
+// Einfacher Tokenizer statt eines echten Shell-Parsers — reicht für den
+// üblichen Fall ("-arg1 -arg2" oder "-datapath \"C:\\Pfad mit Leerzeichen\"")
+// und läuft nie durch eine Shell (kein Interpolieren, siehe CLAUDE.md).
+function parseArgs(raw: string | null): string[] {
+  if (!raw) return []
+  const matches = raw.match(/"[^"]*"|\S+/g) ?? []
+  return matches.map((token) =>
+    token.startsWith('"') && token.endsWith('"') ? token.slice(1, -1) : token
+  )
 }
 
 // spawn() meldet einen ungültigen Pfad (z. B. ein verschobenes/deinstalliertes
@@ -227,9 +252,9 @@ export async function launchEntry(id: string): Promise<void> {
 // wird das zu einer unbehandelten Exception im Main-Prozess — die ganze App
 // stürzt ab, statt dass der Start einfach fehlschlägt und der Renderer eine
 // Fehlermeldung zeigen kann.
-function spawnDetached(path: string, cwd: string): Promise<void> {
+function spawnDetached(path: string, cwd: string, args: string[] = []): Promise<void> {
   return new Promise((resolve, reject) => {
-    const child = spawn(path, [], { detached: true, stdio: 'ignore', cwd })
+    const child = spawn(path, args, { detached: true, stdio: 'ignore', cwd })
     child.once('error', reject)
     child.once('spawn', () => {
       child.unref()
@@ -358,6 +383,10 @@ export function registerEntryHandlers(getWindow: () => BrowserWindow | null): vo
   })
 
   ipcMain.handle('entries:rename', (_event, id: string, name: string) => renameEntry(id, name))
+
+  ipcMain.handle('entries:setLaunchArgs', (_event, id: string, args: string) =>
+    setLaunchArgs(id, args)
+  )
 
   ipcMain.handle('entries:toggleTag', (_event, id: string, tagId: string) =>
     toggleEntryTag(id, tagId)
