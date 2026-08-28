@@ -14,11 +14,13 @@ export function ScannerDialog({ onClose, onImported }: ScannerDialogProps): Reac
   const [loading, setLoading] = useState(true)
   const [importing, setImporting] = useState(false)
   const [candidates, setCandidates] = useState<Candidate[]>([])
+  const [skipped, setSkipped] = useState<string[]>([])
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set())
 
   useEffect(() => {
-    window.api.scan().then((found) => {
+    window.api.scan().then(({ candidates: found, skipped: skippedReasons }) => {
       setCandidates(found)
+      setSkipped(skippedReasons)
       setSelectedKeys(
         new Set(found.filter((c) => !c.alreadyImported && c.likelyRelevant).map((c) => c.key))
       )
@@ -108,6 +110,21 @@ export function ScannerDialog({ onClose, onImported }: ScannerDialogProps): Reac
             <IconX className="h-4 w-4" />
           </button>
         </div>
+
+        {!loading && skipped.length > 0 && (
+          <details className="rounded-lg border border-amber/40 bg-panel px-3 py-2 text-sm text-amber">
+            <summary className="flex cursor-pointer items-center gap-2">
+              <IconAlertTriangle className="h-4 w-4 shrink-0" />
+              {skipped.length} {skipped.length === 1 ? 'Programm' : 'Programme'} konnten nicht
+              automatisch übernommen werden
+            </summary>
+            <ul className="mt-2 flex flex-col gap-1 text-xs text-text-muted">
+              {skipped.map((reason, index) => (
+                <li key={index}>{reason}</li>
+              ))}
+            </ul>
+          </details>
+        )}
 
         {loading ? (
           <p className="text-sm text-text-muted">Durchsuche …</p>

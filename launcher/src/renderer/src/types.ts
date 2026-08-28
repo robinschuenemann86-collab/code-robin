@@ -54,6 +54,11 @@ export interface Candidate {
   likelyRelevant: boolean
 }
 
+export interface ScanResult {
+  candidates: Candidate[]
+  skipped: string[]
+}
+
 export interface EntryStats {
   entryId: string
   totalPlayedMs: number

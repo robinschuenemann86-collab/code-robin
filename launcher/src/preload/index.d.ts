@@ -1,5 +1,5 @@
 import type { Entry, SavedView, Session, Tag } from '../main/store'
-import type { Candidate } from '../main/scanner'
+import type { Candidate, ScanResult } from '../main/scanner'
 import type { EntryStats, OverviewData } from '../main/stats'
 import type { UpdaterStatus } from '../main/updater'
 
@@ -33,7 +33,7 @@ export interface LauncherApi {
   addSavedView: (view: Omit<SavedView, 'id'>) => Promise<SavedView[]>
   removeSavedView: (id: string) => Promise<SavedView[]>
 
-  scan: () => Promise<Candidate[]>
+  scan: () => Promise<ScanResult>
   importCandidates: (candidates: Candidate[]) => Promise<Entry[]>
 
   listStats: () => Promise<EntryStats[]>

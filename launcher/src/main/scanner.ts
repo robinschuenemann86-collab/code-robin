@@ -225,12 +225,15 @@ function findMainExecutable(installPath: string): string | null {
   return basename(candidates[0])
 }
 
-async function scanSteam(existingSteamAppIds: Set<string>): Promise<Candidate[]> {
+async function scanSteam(
+  existingSteamAppIds: Set<string>
+): Promise<{ candidates: Candidate[]; skipped: string[] }> {
   const steamPath = await findSteamPath()
-  if (!steamPath) return []
+  if (!steamPath) return { candidates: [], skipped: [] }
 
   const libraries = readLibraryFolders(steamPath)
   const candidates: Candidate[] = []
+  const skipped: string[] = []
 
   for (const library of libraries) {
     const steamappsDir = join(library, 'steamapps')
@@ -254,7 +257,10 @@ async function scanSteam(existingSteamAppIds: Set<string>): Promise<Candidate[]>
         const appState = manifest['AppState'] as Record<string, unknown> | undefined
         const name = appState?.['name'] as string | undefined
         const installDir = appState?.['installdir'] as string | undefined
-        if (!name || !installDir) continue
+        if (!name || !installDir) {
+          skipped.push(`Steam: ${file} enthält keinen Namen oder Installationsordner.`)
+          continue
+        }
 
         const installPath = join(steamappsDir, 'common', installDir)
         if (!existsSync(installPath)) continue
@@ -275,12 +281,13 @@ async function scanSteam(existingSteamAppIds: Set<string>): Promise<Candidate[]>
           likelyRelevant: true
         })
       } catch {
+        skipped.push(`Steam: ${file} konnte nicht gelesen werden.`)
         continue
       }
     }
   }
 
-  return candidates
+  return { candidates, skipped }
 }
 
 const EPIC_MANIFESTS_DIR = join(
@@ -293,17 +300,20 @@ const EPIC_MANIFESTS_DIR = join(
 
 // Epics eigene Manifeste liefern den Installationsordner UND den relativen
 // Pfad zur Start-EXE direkt mit — anders als bei Steam ist hier kein Raten nötig.
-async function scanEpic(existingEpicAppNames: Set<string>): Promise<Candidate[]> {
-  if (!existsSync(EPIC_MANIFESTS_DIR)) return []
+async function scanEpic(
+  existingEpicAppNames: Set<string>
+): Promise<{ candidates: Candidate[]; skipped: string[] }> {
+  if (!existsSync(EPIC_MANIFESTS_DIR)) return { candidates: [], skipped: [] }
 
   let files: string[]
   try {
     files = readdirSync(EPIC_MANIFESTS_DIR)
   } catch {
-    return []
+    return { candidates: [], skipped: [] }
   }
 
   const candidates: Candidate[] = []
+  const skipped: string[] = []
 
   for (const file of files) {
     if (!file.toLowerCase().endsWith('.item')) continue
@@ -322,10 +332,16 @@ async function scanEpic(existingEpicAppNames: Set<string>): Promise<Candidate[]>
       const installLocation = manifest['InstallLocation'] as string | undefined
       const launchExecutable = manifest['LaunchExecutable'] as string | undefined
       const appName = manifest['AppName'] as string | undefined
-      if (!displayName || !installLocation || !launchExecutable || !appName) continue
+      if (!displayName || !installLocation || !launchExecutable || !appName) {
+        skipped.push(`Epic: ${file} enthält nicht alle nötigen Angaben.`)
+        continue
+      }
 
       const exePath = join(installLocation, launchExecutable)
-      if (!existsSync(exePath)) continue
+      if (!existsSync(exePath)) {
+        skipped.push(`Epic: Start-Datei für "${displayName}" wurde nicht gefunden.`)
+        continue
+      }
 
       const iconHash = await ensureIconCached(exePath)
       candidates.push({
@@ -343,11 +359,12 @@ async function scanEpic(existingEpicAppNames: Set<string>): Promise<Candidate[]>
         likelyRelevant: true
       })
     } catch {
+      skipped.push(`Epic: ${file} konnte nicht gelesen werden.`)
       continue
     }
   }
 
-  return candidates
+  return { candidates, skipped }
 }
 
 const BATTLENET_CONFIG_PATH = join(
@@ -366,27 +383,36 @@ interface BattleNetGameEntry {
 // "wow", "fenris" für Diablo IV). Diese Codes sind gleichzeitig die
 // battlenet://<code>-Kennung zum Starten — wir lesen sie direkt aus der
 // Datei, statt eine eigene, schnell veraltende Zuordnungstabelle zu pflegen.
-async function scanBattleNet(existingCodes: Set<string>): Promise<Candidate[]> {
-  if (!existsSync(BATTLENET_CONFIG_PATH)) return []
+async function scanBattleNet(
+  existingCodes: Set<string>
+): Promise<{ candidates: Candidate[]; skipped: string[] }> {
+  if (!existsSync(BATTLENET_CONFIG_PATH)) return { candidates: [], skipped: [] }
 
   let config: Record<string, unknown>
   try {
     config = JSON.parse(readFileSync(BATTLENET_CONFIG_PATH, 'utf-8'))
   } catch {
-    return []
+    return {
+      candidates: [],
+      skipped: ['Battle.net: Battle.net.config konnte nicht gelesen werden.']
+    }
   }
 
   const games = config['Games']
-  if (!games || typeof games !== 'object') return []
+  if (!games || typeof games !== 'object') return { candidates: [], skipped: [] }
 
   const candidates: Candidate[] = []
+  const skipped: string[] = []
 
   for (const [code, value] of Object.entries(games as Record<string, unknown>)) {
     const installPath = (value as BattleNetGameEntry | undefined)?.InstallPath
     if (!installPath || !existsSync(installPath)) continue
 
     const exeName = findMainExecutable(installPath)
-    if (!exeName) continue
+    if (!exeName) {
+      skipped.push(`Battle.net: Start-Datei für "${basename(installPath)}" wurde nicht gefunden.`)
+      continue
+    }
 
     const iconHash = await ensureIconCached(join(installPath, exeName))
     candidates.push({
@@ -405,7 +431,7 @@ async function scanBattleNet(existingCodes: Set<string>): Promise<Candidate[]> {
     })
   }
 
-  return candidates
+  return { candidates, skipped }
 }
 
 const UBISOFT_INSTALLS_KEY = 'HKLM\\SOFTWARE\\WOW6432Node\\Ubisoft\\Launcher\\Installs'
@@ -438,15 +464,21 @@ function parseUbisoftInstalls(output: string): { id: string; installDir: string 
 // Einen hübschen Anzeigenamen liefert die Registry hier nicht mit (der steckt
 // in einer undokumentierten, binären Cache-Datei); der Ordnername ist der
 // verlässlichste Ansatzpunkt, den man ohne Rätselraten am Binärformat bekommt.
-async function scanUbisoft(existingUbisoftIds: Set<string>): Promise<Candidate[]> {
+async function scanUbisoft(
+  existingUbisoftIds: Set<string>
+): Promise<{ candidates: Candidate[]; skipped: string[] }> {
   const output = await runReg(['query', UBISOFT_INSTALLS_KEY, '/s'])
-  if (!output) return []
+  if (!output) return { candidates: [], skipped: [] }
 
   const candidates: Candidate[] = []
+  const skipped: string[] = []
   for (const { id, installDir } of parseUbisoftInstalls(output)) {
     if (!existsSync(installDir)) continue
     const exeName = findMainExecutable(installDir)
-    if (!exeName) continue
+    if (!exeName) {
+      skipped.push(`Ubisoft Connect: Start-Datei für "${basename(installDir)}" wurde nicht gefunden.`)
+      continue
+    }
 
     const iconHash = await ensureIconCached(join(installDir, exeName))
     candidates.push({
@@ -465,7 +497,7 @@ async function scanUbisoft(existingUbisoftIds: Set<string>): Promise<Candidate[]
     })
   }
 
-  return candidates
+  return { candidates, skipped }
 }
 
 const EA_GAMES_KEY = 'HKLM\\SOFTWARE\\WOW6432Node\\Origin Games'
@@ -524,11 +556,14 @@ function readEaInstallerData(installDir: string): { name: string | null; exePath
   }
 }
 
-async function scanEa(existingPaths: Set<string>): Promise<Candidate[]> {
+async function scanEa(
+  existingPaths: Set<string>
+): Promise<{ candidates: Candidate[]; skipped: string[] }> {
   const output = await runReg(['query', EA_GAMES_KEY, '/s'])
-  if (!output) return []
+  if (!output) return { candidates: [], skipped: [] }
 
   const candidates: Candidate[] = []
+  const skipped: string[] = []
   for (const { installDir } of parseEaInstalls(output)) {
     if (!existsSync(installDir)) continue
 
@@ -538,7 +573,10 @@ async function scanEa(existingPaths: Set<string>): Promise<Candidate[]> {
       const exeName = findMainExecutable(installDir)
       resolvedExePath = exeName ? join(installDir, exeName) : null
     }
-    if (!resolvedExePath) continue
+    if (!resolvedExePath) {
+      skipped.push(`EA: Start-Datei für "${name ?? basename(installDir)}" wurde nicht gefunden.`)
+      continue
+    }
 
     const iconHash = await ensureIconCached(resolvedExePath)
     candidates.push({
@@ -557,7 +595,7 @@ async function scanEa(existingPaths: Set<string>): Promise<Candidate[]> {
     })
   }
 
-  return candidates
+  return { candidates, skipped }
 }
 
 const GOG_GAMES_KEY = 'HKLM\\SOFTWARE\\WOW6432Node\\GOG.com\\Games'
@@ -606,11 +644,14 @@ function parseGogInstalls(output: string): GogRecord[] {
 // Hintergrund und ohne eigenes URI-Startschema — im Gegensatz zu Steam/Epic/
 // Battle.net/Ubisoft ist hier also kein Login und kein spezieller Start-Weg
 // nötig, nur die Installationsdaten aus der Registry.
-async function scanGog(existingPaths: Set<string>): Promise<Candidate[]> {
+async function scanGog(
+  existingPaths: Set<string>
+): Promise<{ candidates: Candidate[]; skipped: string[] }> {
   const output = await runReg(['query', GOG_GAMES_KEY, '/s'])
-  if (!output) return []
+  if (!output) return { candidates: [], skipped: [] }
 
   const candidates: Candidate[] = []
+  const skipped: string[] = []
   for (const record of parseGogInstalls(output)) {
     if (!record.path || !existsSync(record.path)) continue
 
@@ -619,7 +660,12 @@ async function scanGog(existingPaths: Set<string>): Promise<Candidate[]> {
       const exeName = findMainExecutable(record.path)
       exePath = exeName ? join(record.path, exeName) : null
     }
-    if (!exePath) continue
+    if (!exePath) {
+      skipped.push(
+        `GOG: Start-Datei für "${record.gameName ?? basename(record.path)}" wurde nicht gefunden.`
+      )
+      continue
+    }
 
     const iconHash = await ensureIconCached(exePath)
     candidates.push({
@@ -638,10 +684,19 @@ async function scanGog(existingPaths: Set<string>): Promise<Candidate[]> {
     })
   }
 
-  return candidates
+  return { candidates, skipped }
 }
 
-async function scan(): Promise<Candidate[]> {
+export interface ScanResult {
+  candidates: Candidate[]
+  // Menschenlesbare Hinweise, wenn eine gefundene Installation nicht zu einem
+  // Kandidaten werden konnte (z. B. Start-Datei nicht auffindbar, Manifest
+  // beschädigt) — erklärt, warum ein installiertes Programm mal nicht auftaucht,
+  // statt es kommentarlos verschwinden zu lassen.
+  skipped: string[]
+}
+
+async function scan(): Promise<ScanResult> {
   const entries = getStore().get('entries')
   const existingPaths = new Set(entries.map((e) => e.path))
   const existingSteamAppIds = new Set(
@@ -657,15 +712,7 @@ async function scan(): Promise<Candidate[]> {
     entries.map((e) => e.ubisoftId).filter((id): id is string => !!id)
   )
 
-  const [
-    registryCandidates,
-    steamCandidates,
-    epicCandidates,
-    battlenetCandidates,
-    ubisoftCandidates,
-    eaCandidates,
-    gogCandidates
-  ] = await Promise.all([
+  const [registryCandidates, steam, epic, battlenet, ubisoft, ea, gog] = await Promise.all([
     scanRegistry(existingPaths),
     scanSteam(existingSteamAppIds),
     scanEpic(existingEpicAppNames),
@@ -675,15 +722,25 @@ async function scan(): Promise<Candidate[]> {
     scanGog(existingPaths)
   ])
 
-  return [
-    ...steamCandidates,
-    ...epicCandidates,
-    ...battlenetCandidates,
-    ...ubisoftCandidates,
-    ...eaCandidates,
-    ...gogCandidates,
-    ...registryCandidates
-  ]
+  return {
+    candidates: [
+      ...steam.candidates,
+      ...epic.candidates,
+      ...battlenet.candidates,
+      ...ubisoft.candidates,
+      ...ea.candidates,
+      ...gog.candidates,
+      ...registryCandidates
+    ],
+    skipped: [
+      ...steam.skipped,
+      ...epic.skipped,
+      ...battlenet.skipped,
+      ...ubisoft.skipped,
+      ...ea.skipped,
+      ...gog.skipped
+    ]
+  }
 }
 
 // Der Renderer schickt die zuvor per scan() gelieferten Kandidaten zurück —
