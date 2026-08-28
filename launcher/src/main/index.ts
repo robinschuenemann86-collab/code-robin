@@ -7,7 +7,7 @@ import { registerEntryHandlers } from './entries'
 import { registerTagHandlers } from './tags'
 import { registerScannerHandlers } from './scanner'
 import { registerStatsHandlers } from './stats'
-import { closeDanglingSessions } from './playtime'
+import { archiveOldSessions, closeDanglingSessions } from './playtime'
 import { registerIconProtocolScheme, registerIconProtocolHandler } from './iconProtocol'
 import { registerUpdaterHandlers } from './updater'
 import { registerTray, unregisterHotkey } from './tray'
@@ -117,6 +117,7 @@ app.whenReady().then(() => {
   registerIconProtocolHandler()
   initStore()
   closeDanglingSessions()
+  archiveOldSessions()
   registerEntryHandlers(() => mainWindow)
   registerTagHandlers()
   registerScannerHandlers(() => mainWindow)

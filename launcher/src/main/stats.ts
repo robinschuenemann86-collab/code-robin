@@ -10,7 +10,22 @@ export interface EntryStats {
 
 function computeStats(): EntryStats[] {
   const sessions = getStore().get('sessions')
+  const archive = getStore().get('sessionArchive')
   const byEntry = new Map<string, EntryStats>()
+
+  // Archivierte (weil zu alte) Sitzungen fließen als Aggregat ein, damit
+  // Gesamtspielzeit und Start-Zähler durchs Archivieren nicht zurückspringen
+  // (siehe playtime.ts archiveOldSessions). lastPlayedAt kommt bewusst nur aus
+  // den verbliebenen Sitzungen unten — archiviert werden immer die ältesten,
+  // die neueste (und damit "zuletzt gespielt") bleibt also erhalten.
+  for (const [entryId, rollup] of Object.entries(archive)) {
+    byEntry.set(entryId, {
+      entryId,
+      totalPlayedMs: rollup.totalPlayedMs,
+      lastPlayedAt: null,
+      launchCount: rollup.launchCount
+    })
+  }
 
   for (const session of sessions) {
     const existing = byEntry.get(session.entryId) ?? {
@@ -95,7 +110,12 @@ function computeOverview(): OverviewData {
   }
 
   let playedThisWeekMs = 0
-  let totalLaunches = 0
+  // Archivierte Sitzungen zählen weiter zur Gesamtzahl der Starts mit — nur
+  // die Einzelsitzungen dahinter sind aus `sessions` verschwunden.
+  let totalLaunches = Object.values(getStore().get('sessionArchive')).reduce(
+    (sum, rollup) => sum + rollup.launchCount,
+    0
+  )
   const recentSessions: OverviewData['recentSessions'] = []
 
   for (const session of sessions) {
@@ -134,11 +154,14 @@ export function getMostRecentlyPlayedEntryId(): string | null {
 // Für die Sitzungshistorie im Detail-Panel — bislang gab es dafür nur
 // Aggregate (Gesamtspielzeit, Anzahl Starts) oder eine globale, spielübergreifende
 // Liste, aber keine Sitzung-für-Sitzung-Ansicht für ein einzelnes Programm.
+const MAX_SESSION_HISTORY = 50
+
 function getSessionsForEntry(entryId: string): Session[] {
   return getStore()
     .get('sessions')
     .filter((session) => session.entryId === entryId && session.endedAt !== null)
     .sort((a, b) => b.startedAt - a.startedAt)
+    .slice(0, MAX_SESSION_HISTORY)
 }
 
 // Für das "Läuft gerade"-Abzeichen in der Bibliothek — eine offene Sitzung

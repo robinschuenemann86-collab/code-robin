@@ -1,10 +1,16 @@
 import { spawn } from 'child_process'
 import { randomUUID } from 'crypto'
-import { getStore, setSessions, type Session } from './store'
+import { getStore, setSessionArchive, setSessions, type Session } from './store'
 
 const POLL_INTERVAL_MS = 15_000
 const MISSES_BEFORE_END = 2 // ~30s Abwesenheit, bevor eine Sitzung als beendet gilt
 const STARTUP_GRACE_MS = 3 * 60_000 // Zeit, die ein Spiel zum Starten haben darf
+
+// Wie viele abgeschlossene Sitzungen pro Programm im Detail behalten werden,
+// bevor ältere in ein Aggregat wandern — verhindert, dass die Datendatei bei
+// jahrelanger Nutzung unbegrenzt wächst, ohne Gesamtspielzeit oder
+// Start-Zähler zu verlieren (siehe archiveOldSessions).
+const MAX_SESSIONS_PER_ENTRY = 200
 
 // Reine In-Memory-Zähler pro laufender Sitzung — müssen die App-Laufzeit nicht
 // überleben, da beim Start ohnehin alle offenen Sitzungen geschlossen werden.
@@ -40,6 +46,47 @@ export function closeDanglingSessions(): void {
   const hasOpen = sessions.some((s) => s.endedAt === null)
   if (!hasOpen) return
   setSessions(sessions.map((s) => (s.endedAt === null ? { ...s, endedAt: s.startedAt } : s)))
+}
+
+// Läuft einmal beim App-Start: für jedes Programm mit mehr als
+// MAX_SESSIONS_PER_ENTRY abgeschlossenen Sitzungen wandern die ältesten
+// überzähligen in ein Aggregat (Gesamtspielzeit + Anzahl), statt für immer
+// als Einzelsitzungen in der Datendatei zu bleiben. Eine laufende Sitzung
+// (endedAt: null) wird nie archiviert.
+export function archiveOldSessions(): void {
+  const sessions = getStore().get('sessions')
+
+  const byEntry = new Map<string, Session[]>()
+  for (const session of sessions) {
+    if (session.endedAt === null) continue
+    const list = byEntry.get(session.entryId)
+    if (list) list.push(session)
+    else byEntry.set(session.entryId, [session])
+  }
+
+  const toRemove = new Set<string>()
+  const archive = { ...getStore().get('sessionArchive') }
+  let changed = false
+
+  for (const [entryId, entrySessions] of byEntry) {
+    if (entrySessions.length <= MAX_SESSIONS_PER_ENTRY) continue
+
+    entrySessions.sort((a, b) => a.startedAt - b.startedAt)
+    const excess = entrySessions.slice(0, entrySessions.length - MAX_SESSIONS_PER_ENTRY)
+    const addedMs = excess.reduce((sum, s) => sum + ((s.endedAt as number) - s.startedAt), 0)
+    for (const session of excess) toRemove.add(session.id)
+
+    const current = archive[entryId] ?? { totalPlayedMs: 0, launchCount: 0 }
+    archive[entryId] = {
+      totalPlayedMs: current.totalPlayedMs + addedMs,
+      launchCount: current.launchCount + excess.length
+    }
+    changed = true
+  }
+
+  if (!changed) return
+  setSessionArchive(archive)
+  setSessions(sessions.filter((s) => !toRemove.has(s.id)))
 }
 
 async function pollTick(): Promise<void> {

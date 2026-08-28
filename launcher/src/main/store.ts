@@ -58,6 +58,14 @@ const SessionSchema = z.object({
   endedAt: z.number().nullable()
 })
 
+// Aufsummierte Spielzeit/Startanzahl für Sitzungen, die wegen ihres Alters aus
+// `sessions` entfernt wurden (siehe playtime.ts archiveOldSessions) — ohne das
+// würden Gesamtspielzeit und Start-Zähler nach dem Archivieren zurückspringen.
+const SessionArchiveEntrySchema = z.object({
+  totalPlayedMs: z.number(),
+  launchCount: z.number()
+})
+
 // Eine gespeicherte Kombination aus Tag-Filter, Sortierung und Suchtext, die
 // man mit einem Klick wieder anwenden kann, statt sie jedes Mal neu zu setzen
 // (nach dem Vorbild von GOG Galaxys anpassbaren Bibliotheks-Ansichten).
@@ -78,13 +86,15 @@ const StoreDataSchema = z.object({
   tags: z.array(TagSchema),
   sessions: z.array(SessionSchema),
   settings: z.record(z.string(), z.unknown()),
-  savedViews: z.array(SavedViewSchema).default([])
+  savedViews: z.array(SavedViewSchema).default([]),
+  sessionArchive: z.record(z.string(), SessionArchiveEntrySchema).default({})
 })
 
 export type Entry = z.infer<typeof EntrySchema>
 export type Tag = z.infer<typeof TagSchema>
 export type Session = z.infer<typeof SessionSchema>
 export type SavedView = z.infer<typeof SavedViewSchema>
+export type SessionArchiveEntry = z.infer<typeof SessionArchiveEntrySchema>
 export type StoreData = z.infer<typeof StoreDataSchema>
 
 const defaults: StoreData = {
@@ -93,7 +103,8 @@ const defaults: StoreData = {
   tags: [],
   sessions: [],
   settings: {},
-  savedViews: []
+  savedViews: [],
+  sessionArchive: {}
 }
 
 // Stand vor Tags: Einträge hatten ein einzelnes `category`-Feld, Kategorien
@@ -300,6 +311,16 @@ export function setSettings(settings: StoreData['settings']): void {
   }
   backupBeforeWrite()
   store.set('settings', settings)
+}
+
+export function setSessionArchive(sessionArchive: StoreData['sessionArchive']): void {
+  const draft = { ...store.store, sessionArchive }
+  const parsed = StoreDataSchema.safeParse(draft)
+  if (!parsed.success) {
+    throw new Error(`Ungültige Archiv-Daten: ${parsed.error.message}`)
+  }
+  backupBeforeWrite()
+  store.set('sessionArchive', sessionArchive)
 }
 
 export function setSavedViews(savedViews: SavedView[]): void {
