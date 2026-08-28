@@ -8,6 +8,7 @@ import { registerTagHandlers } from './tags'
 import { registerScannerHandlers } from './scanner'
 import { registerStatsHandlers } from './stats'
 import { archiveOldSessions, closeDanglingSessions } from './playtime'
+import { destroyDiscordPresence, initDiscordPresence } from './discordPresence'
 import { registerIconProtocolScheme, registerIconProtocolHandler } from './iconProtocol'
 import { registerUpdaterHandlers } from './updater'
 import { registerTray, unregisterHotkey } from './tray'
@@ -118,6 +119,7 @@ app.whenReady().then(() => {
   initStore()
   closeDanglingSessions()
   archiveOldSessions()
+  initDiscordPresence()
   registerEntryHandlers(() => mainWindow)
   registerTagHandlers()
   registerScannerHandlers(() => mainWindow)
@@ -142,6 +144,7 @@ app.whenReady().then(() => {
 app.on('before-quit', () => {
   isQuitting = true
   unregisterHotkey()
+  destroyDiscordPresence()
 })
 
 // Quit when all windows are closed, except on macOS. There, it's common

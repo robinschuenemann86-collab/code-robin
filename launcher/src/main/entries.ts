@@ -7,6 +7,7 @@ import { existsSync } from 'fs'
 import { getStore, setEntries, setSessions, nextOrder, type Entry } from './store'
 import { ensureIconCached, removeCachedIcon, setCustomIcon } from './icons'
 import { startSession } from './playtime'
+import { setDiscordPresence } from './discordPresence'
 import { fetchCoverArtForNewEntries } from './coverArt'
 
 function deriveName(targetPath: string): string {
@@ -284,6 +285,10 @@ export async function launchEntry(id: string): Promise<void> {
   }
 
   startSession(entry.id, entry.expectedProcessName)
+  // Nur wenn wirklich eine Sitzung getrackt wird (siehe startSession-Guard) —
+  // sonst würde "Spielt gerade X" nie wieder verschwinden, weil auch das
+  // Ende nur über das Prozess-Polling erkannt wird.
+  if (entry.expectedProcessName) setDiscordPresence(entry.name)
 }
 
 // Einfacher Tokenizer statt eines echten Shell-Parsers — reicht für den

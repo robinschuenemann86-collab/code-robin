@@ -1,6 +1,7 @@
 import { spawn } from 'child_process'
 import { randomUUID } from 'crypto'
 import { getStore, setSessionArchive, setSessions, type Session } from './store'
+import { clearDiscordPresence } from './discordPresence'
 
 const POLL_INTERVAL_MS = 15_000
 const MISSES_BEFORE_END = 2 // ~30s Abwesenheit, bevor eine Sitzung als beendet gilt
@@ -140,7 +141,13 @@ async function pollTick(): Promise<void> {
     return session
   })
 
-  if (changed) setSessions(updated)
+  if (changed) {
+    setSessions(updated)
+    // Sobald keine Sitzung mehr offen ist, läuft (soweit MR Launch weiß)
+    // gerade kein getracktes Spiel mehr — "Spielt gerade X" soll dann wieder
+    // verschwinden statt das zuletzt beendete Spiel weiter anzuzeigen.
+    if (!updated.some((s) => s.endedAt === null)) clearDiscordPresence()
+  }
 }
 
 function ensurePolling(): void {
