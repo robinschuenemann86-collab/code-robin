@@ -9,12 +9,15 @@ import { ScannerDialog } from './components/ScannerDialog'
 import { StatsDialog } from './components/StatsDialog'
 import { OverviewDialog } from './components/OverviewDialog'
 import { CoverArtKeyDialog } from './components/CoverArtKeyDialog'
+import { ShortcutsDialog } from './components/ShortcutsDialog'
 import { BigPictureView } from './components/BigPictureView'
 import {
   IconAlertTriangle,
   IconApps,
   IconClock,
+  IconDice,
   IconExpand,
+  IconHelp,
   IconMore,
   IconPlus,
   IconSearch,
@@ -40,6 +43,7 @@ function App(): ReactElement {
   const [overviewOpen, setOverviewOpen] = useState(false)
   const [overview, setOverview] = useState<OverviewData | null>(null)
   const [coverArtKeyDialogOpen, setCoverArtKeyDialogOpen] = useState(false)
+  const [shortcutsOpen, setShortcutsOpen] = useState(false)
   const [updaterStatus, setUpdaterStatus] = useState<UpdaterStatus | null>(null)
   const [bigPictureMode, setBigPictureMode] = useState(false)
 
@@ -284,6 +288,16 @@ function App(): ReactElement {
     await window.api.installUpdate()
   }
 
+  function handleRandomPick(): void {
+    if (filteredEntries.length === 0) {
+      setStatus('Keine Programme in der aktuellen Ansicht.')
+      return
+    }
+    const pick = filteredEntries[Math.floor(Math.random() * filteredEntries.length)]
+    setSelectedEntryId(pick.id)
+    setStatus(`Wie wär's mit "${pick.name}"?`)
+  }
+
   async function handleToggleTag(id: string, tagId: string): Promise<void> {
     setEntries(await window.api.toggleEntryTag(id, tagId))
   }
@@ -341,7 +355,7 @@ function App(): ReactElement {
       // Sonst würden Pfeiltasten/Enter/Entf durch einen offenen Dialog
       // hindurch auf die dahinterliegende Bibliothek wirken — z. B. Enter
       // startet ein Spiel, während gerade der Übersicht-Dialog offen ist.
-      if (scannerOpen || statsOpen || overviewOpen || coverArtKeyDialogOpen) return
+      if (scannerOpen || statsOpen || overviewOpen || coverArtKeyDialogOpen || shortcutsOpen) return
       const activeTag = document.activeElement?.tagName
       if (activeTag === 'INPUT' || activeTag === 'TEXTAREA' || activeTag === 'SELECT') return
       if (filteredEntries.length === 0) return
@@ -388,7 +402,8 @@ function App(): ReactElement {
     scannerOpen,
     statsOpen,
     overviewOpen,
-    coverArtKeyDialogOpen
+    coverArtKeyDialogOpen,
+    shortcutsOpen
   ])
 
   function resetFilters(): void {
@@ -402,9 +417,11 @@ function App(): ReactElement {
     return (
       <BigPictureView
         entries={filteredEntries}
+        totalEntryCount={entries.length}
         runningIds={runningIds}
         onLaunch={handleLaunch}
         onExit={() => window.api.setFullscreen(false)}
+        onResetFilters={resetFilters}
       />
     )
   }
@@ -451,6 +468,13 @@ function App(): ReactElement {
             <IconSearch />
           </button>
           <button
+            onClick={handleRandomPick}
+            title="Was soll ich spielen?"
+            className="rounded-lg border border-border bg-panel p-2.5 text-text transition hover:border-gold/50 hover:text-gold"
+          >
+            <IconDice />
+          </button>
+          <button
             onClick={handleAdd}
             title="Programm hinzufügen"
             className="glow-ember ember-grad-bg rounded-lg p-2.5 text-on-ember transition hover:brightness-110"
@@ -463,6 +487,13 @@ function App(): ReactElement {
             className="rounded-lg border border-border bg-panel p-2.5 text-text transition hover:border-gold/50 hover:text-gold"
           >
             <IconMore />
+          </button>
+          <button
+            onClick={() => setShortcutsOpen(true)}
+            title="Tastenkürzel"
+            className="rounded-lg border border-border bg-panel p-2.5 text-text transition hover:border-gold/50 hover:text-gold"
+          >
+            <IconHelp />
           </button>
         </div>
       </header>
@@ -843,6 +874,8 @@ function App(): ReactElement {
       {coverArtKeyDialogOpen && (
         <CoverArtKeyDialog onClose={() => setCoverArtKeyDialogOpen(false)} />
       )}
+
+      {shortcutsOpen && <ShortcutsDialog onClose={() => setShortcutsOpen(false)} />}
     </div>
   )
 }

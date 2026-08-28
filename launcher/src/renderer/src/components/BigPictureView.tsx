@@ -5,18 +5,22 @@ import logo from '../assets/logo.png'
 
 interface BigPictureViewProps {
   entries: Entry[]
+  totalEntryCount: number
   runningIds: Set<string>
   onLaunch: (entry: Entry) => void
   onExit: () => void
+  onResetFilters: () => void
 }
 
 const COLUMNS = 5
 
 export function BigPictureView({
   entries,
+  totalEntryCount,
   runningIds,
   onLaunch,
-  onExit
+  onExit,
+  onResetFilters
 }: BigPictureViewProps): ReactElement {
   const [selectedIndex, setSelectedIndex] = useState(0)
 
@@ -129,7 +133,16 @@ export function BigPictureView({
       </div>
 
       {entries.length === 0 ? (
-        <p className="relative z-10 text-text-muted">Keine Programme in dieser Ansicht.</p>
+        <div className="relative z-10 flex flex-col items-start gap-2">
+          <p className="text-text-muted">
+            {totalEntryCount === 0 ? 'Noch keine Programme.' : 'Keine Programme in dieser Ansicht.'}
+          </p>
+          {totalEntryCount > 0 && (
+            <button onClick={onResetFilters} className="text-sm text-gold underline hover:brightness-125">
+              Filter zurücksetzen
+            </button>
+          )}
+        </div>
       ) : (
         <div
           className="relative z-10 grid flex-1 content-start gap-6 overflow-y-auto"

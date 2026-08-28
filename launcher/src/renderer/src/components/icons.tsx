@@ -216,3 +216,28 @@ export function IconClock(props: IconProps): ReactElement {
     </>
   )
 }
+
+export function IconDice(props: IconProps): ReactElement {
+  return base(
+    props,
+    <>
+      <rect x="3.5" y="3.5" width="17" height="17" rx="3" />
+      <circle cx="8.3" cy="8.3" r="1.15" fill="currentColor" stroke="none" />
+      <circle cx="15.7" cy="8.3" r="1.15" fill="currentColor" stroke="none" />
+      <circle cx="12" cy="12" r="1.15" fill="currentColor" stroke="none" />
+      <circle cx="8.3" cy="15.7" r="1.15" fill="currentColor" stroke="none" />
+      <circle cx="15.7" cy="15.7" r="1.15" fill="currentColor" stroke="none" />
+    </>
+  )
+}
+
+export function IconHelp(props: IconProps): ReactElement {
+  return base(
+    props,
+    <>
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M9.3 9.3a2.7 2.7 0 1 1 3.9 2.4c-.8.4-1.2.9-1.2 1.8v.3" />
+      <path d="M12 17.3h.01" />
+    </>
+  )
+}
