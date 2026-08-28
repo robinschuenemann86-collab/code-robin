@@ -35,6 +35,11 @@ export function ScannerDialog({ onClose, onImported }: ScannerDialogProps): Reac
     () => candidates.filter((c) => c.source === 'battlenet'),
     [candidates]
   )
+  const ubisoftCandidates = useMemo(
+    () => candidates.filter((c) => c.source === 'ubisoft'),
+    [candidates]
+  )
+  const eaCandidates = useMemo(() => candidates.filter((c) => c.source === 'ea'), [candidates])
   const registryCandidates = useMemo(
     () => candidates.filter((c) => c.source === 'registry'),
     [candidates]
@@ -112,6 +117,8 @@ export function ScannerDialog({ onClose, onImported }: ScannerDialogProps): Reac
             {renderGroup('Steam-Spiele', steamCandidates)}
             {renderGroup('Epic-Spiele', epicCandidates)}
             {renderGroup('Battle.net-Spiele', battlenetCandidates)}
+            {renderGroup('Ubisoft-Connect-Spiele', ubisoftCandidates)}
+            {renderGroup('EA-Spiele', eaCandidates)}
             {renderGroup('Installierte Programme', registryCandidates)}
           </div>
         )}

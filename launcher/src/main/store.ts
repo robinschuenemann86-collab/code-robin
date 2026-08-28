@@ -1,7 +1,7 @@
 import Store from 'electron-store'
 import { z } from 'zod'
 import { app, dialog } from 'electron'
-import { copyFileSync, existsSync } from 'fs'
+import { copyFileSync, existsSync, readFileSync } from 'fs'
 import { basename, join } from 'path'
 
 const EntrySchema = z.object({
@@ -25,6 +25,9 @@ const EntrySchema = z.object({
   // Analog für Battle.net-Titel: battlenet://<code>. Der Code kommt direkt aus
   // Battle.net.config, nicht aus einer selbst gepflegten Zuordnungstabelle.
   battlenetCode: z.string().nullable().default(null),
+  // Analog für Ubisoft-Connect-Titel: uplay://launch/<id>/0. Die id kommt aus
+  // dem Registry-Schlüssel HKLM\...\Ubisoft\Launcher\Installs\<id>.
+  ubisoftId: z.string().nullable().default(null),
   favorite: z.boolean().default(false),
   // Prozessname (z. B. "Game.exe"), auf den beim Spielzeit-Tracking gepollt wird.
   // Ohne diesen Wert kann keine Spielzeit erfasst werden (siehe playtime.ts).
@@ -125,10 +128,34 @@ export function parseStoreData(raw: unknown): StoreData {
 
 let store: Store<StoreData>
 
+function configFilePath(): string {
+  return join(app.getPath('userData'), 'config.json')
+}
+
+function rollingBackupPath(): string {
+  return `${configFilePath()}.bak`
+}
+
+// Läuft vor jedem Schreibvorgang: die zuletzt bekannte gute Fassung als .bak
+// beiseitelegen. Rein bestes Bemühen — ein fehlgeschlagenes Backup darf einen
+// eigentlich gültigen Schreibvorgang nicht verhindern.
+function backupBeforeWrite(): void {
+  try {
+    const configFile = configFilePath()
+    if (existsSync(configFile)) {
+      copyFileSync(configFile, rollingBackupPath())
+    }
+  } catch {
+    // Nichts zu tun — der eigentliche Schreibvorgang läuft trotzdem weiter.
+  }
+}
+
 // Legt bei einer kaputten Datei ein Backup an und startet mit leeren Daten neu,
-// statt den App-Start zu verhindern.
+// statt den App-Start zu verhindern. Vor dem kompletten Reset erst die
+// rollierende .bak-Sicherung probieren — die ist meist nur eine Änderung
+// älter und rettet damit fast immer den ganzen Bestand.
 export function initStore(): Store<StoreData> {
-  const configFile = join(app.getPath('userData'), 'config.json')
+  const configFile = configFilePath()
 
   try {
     store = new Store<StoreData>({ defaults, clearInvalidConfig: false })
@@ -137,24 +164,47 @@ export function initStore(): Store<StoreData> {
     // wirklich verschwinden statt liegen zu bleiben.
     store.store = parseStoreData(store.store)
   } catch (error) {
+    const recovered = tryRecoverFromBackup()
     if (existsSync(configFile)) {
       copyFileSync(configFile, `${configFile}.broken-${Date.now()}.bak`)
     }
-    store = new Store<StoreData>({ defaults, clearInvalidConfig: true })
-    store.clear()
-    store.set(defaults)
-    dialog.showErrorBox(
-      'Datendatei zurückgesetzt',
-      'Die gespeicherten Daten waren beschädigt und wurden durch eine leere Liste ersetzt. ' +
-        'Ein Backup der alten Datei liegt im selben Ordner.\n\n' +
-        `Fehler: ${error instanceof Error ? error.message : String(error)}`
-    )
+    if (recovered) {
+      store = new Store<StoreData>({ defaults, clearInvalidConfig: false })
+      store.store = recovered
+      dialog.showMessageBox({
+        type: 'warning',
+        message: 'Die zuletzt gespeicherten Daten waren beschädigt.',
+        detail:
+          'Eine minimal ältere, funktionierende Sicherung wurde stattdessen geladen. ' +
+          'Die beschädigte Datei liegt zur Kontrolle im selben Ordner.'
+      })
+    } else {
+      store = new Store<StoreData>({ defaults, clearInvalidConfig: true })
+      store.clear()
+      store.set(defaults)
+      dialog.showErrorBox(
+        'Datendatei zurückgesetzt',
+        'Die gespeicherten Daten waren beschädigt und wurden durch eine leere Liste ersetzt. ' +
+          'Ein Backup der alten Datei liegt im selben Ordner.\n\n' +
+          `Fehler: ${error instanceof Error ? error.message : String(error)}`
+      )
+    }
   }
 
   backfillExpectedProcessNames()
   backfillOrder()
 
   return store
+}
+
+function tryRecoverFromBackup(): StoreData | null {
+  try {
+    const backupFile = rollingBackupPath()
+    if (!existsSync(backupFile)) return null
+    return parseStoreData(JSON.parse(readFileSync(backupFile, 'utf-8')))
+  } catch {
+    return null
+  }
 }
 
 // Einträge aus Ständen vor der Spielzeit-Erfassung kennen expectedProcessName
@@ -203,6 +253,7 @@ export function nextOrder(entries: Entry[]): number {
 // Ersetzt die komplette Datei (z. B. beim Wiederherstellen einer Sicherung),
 // statt einzelne Schlüssel zusammenzuführen.
 export function replaceStoreData(data: StoreData): void {
+  backupBeforeWrite()
   store.store = data
 }
 
@@ -215,6 +266,7 @@ export function setEntries(entries: Entry[]): void {
   if (!parsed.success) {
     throw new Error(`Ungültige Eintragsdaten: ${parsed.error.message}`)
   }
+  backupBeforeWrite()
   store.set('entries', parsed.data.entries)
 }
 
@@ -224,6 +276,7 @@ export function setTags(tags: Tag[]): void {
   if (!parsed.success) {
     throw new Error(`Ungültige Tag-Daten: ${parsed.error.message}`)
   }
+  backupBeforeWrite()
   store.set('tags', tags)
 }
 
@@ -233,6 +286,7 @@ export function setSessions(sessions: Session[]): void {
   if (!parsed.success) {
     throw new Error(`Ungültige Sitzungsdaten: ${parsed.error.message}`)
   }
+  backupBeforeWrite()
   store.set('sessions', sessions)
 }
 
@@ -242,6 +296,7 @@ export function setSettings(settings: StoreData['settings']): void {
   if (!parsed.success) {
     throw new Error(`Ungültige Einstellungsdaten: ${parsed.error.message}`)
   }
+  backupBeforeWrite()
   store.set('settings', settings)
 }
 
@@ -251,5 +306,6 @@ export function setSavedViews(savedViews: SavedView[]): void {
   if (!parsed.success) {
     throw new Error(`Ungültige Ansichts-Daten: ${parsed.error.message}`)
   }
+  backupBeforeWrite()
   store.set('savedViews', savedViews)
 }

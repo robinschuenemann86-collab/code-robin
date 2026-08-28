@@ -10,6 +10,7 @@ export interface Entry {
   steamAppId: string | null
   epicAppName: string | null
   battlenetCode: string | null
+  ubisoftId: string | null
   favorite: boolean
   order: number
   launchArgs: string | null
@@ -37,11 +38,12 @@ export interface SavedView {
 export interface Candidate {
   key: string
   name: string
-  source: 'registry' | 'steam' | 'epic' | 'battlenet'
+  source: 'registry' | 'steam' | 'epic' | 'battlenet' | 'ubisoft' | 'ea'
   path: string
   steamAppId: string | null
   epicAppName: string | null
   battlenetCode: string | null
+  ubisoftId: string | null
   expectedProcessName: string | null
   iconHash: string | null
   alreadyImported: boolean

@@ -11,11 +11,12 @@ import { fetchCoverArtForNewEntries } from './coverArt'
 export interface Candidate {
   key: string
   name: string
-  source: 'registry' | 'steam' | 'epic' | 'battlenet'
+  source: 'registry' | 'steam' | 'epic' | 'battlenet' | 'ubisoft' | 'ea'
   path: string
   steamAppId: string | null
   epicAppName: string | null
   battlenetCode: string | null
+  ubisoftId: string | null
   expectedProcessName: string | null
   iconHash: string | null
   alreadyImported: boolean
@@ -124,6 +125,7 @@ async function scanRegistry(existingPaths: Set<string>): Promise<Candidate[]> {
       steamAppId: null,
       epicAppName: null,
       battlenetCode: null,
+      ubisoftId: null,
       expectedProcessName: basename(exePath),
       iconHash,
       alreadyImported: existingPaths.has(exePath),
@@ -266,6 +268,7 @@ async function scanSteam(existingSteamAppIds: Set<string>): Promise<Candidate[]>
           steamAppId: appId,
           epicAppName: null,
           battlenetCode: null,
+          ubisoftId: null,
           expectedProcessName: findMainExecutable(installPath),
           iconHash,
           alreadyImported: existingSteamAppIds.has(appId),
@@ -333,6 +336,7 @@ async function scanEpic(existingEpicAppNames: Set<string>): Promise<Candidate[]>
         steamAppId: null,
         epicAppName: appName,
         battlenetCode: null,
+        ubisoftId: null,
         expectedProcessName: basename(launchExecutable),
         iconHash,
         alreadyImported: existingEpicAppNames.has(appName),
@@ -393,9 +397,162 @@ async function scanBattleNet(existingCodes: Set<string>): Promise<Candidate[]> {
       steamAppId: null,
       epicAppName: null,
       battlenetCode: code,
+      ubisoftId: null,
       expectedProcessName: exeName,
       iconHash,
       alreadyImported: existingCodes.has(code),
+      likelyRelevant: true
+    })
+  }
+
+  return candidates
+}
+
+const UBISOFT_INSTALLS_KEY = 'HKLM\\SOFTWARE\\WOW6432Node\\Ubisoft\\Launcher\\Installs'
+
+// `reg query <Installs-Schlüssel> /s` gibt eine Unterschlüssel-Zeile pro
+// Spiel aus (der Schlüsselname selbst ist die Ubisoft-Spiel-Id, gleichzeitig
+// die id für uplay://launch/<id>/0), gefolgt vom InstallDir-Wert.
+function parseUbisoftInstalls(output: string): { id: string; installDir: string }[] {
+  const installs: { id: string; installDir: string }[] = []
+  let currentId: string | null = null
+
+  for (const rawLine of output.split(/\r?\n/)) {
+    const keyMatch = rawLine.match(/\\Installs\\(\d+)\s*$/)
+    if (keyMatch) {
+      currentId = keyMatch[1]
+      continue
+    }
+    const valueMatch = rawLine.match(/^ {4}InstallDir\s+REG_SZ\s+(.+)$/)
+    if (valueMatch && currentId) {
+      installs.push({ id: currentId, installDir: valueMatch[1].trim() })
+      currentId = null
+    }
+  }
+
+  return installs
+}
+
+// Ubisoft Connect legt zu jedem installierten Spiel unter diesem
+// Registry-Schlüssel InstallDir und Spiel-Id ab — ohne Anmeldung, ohne Netz.
+// Einen hübschen Anzeigenamen liefert die Registry hier nicht mit (der steckt
+// in einer undokumentierten, binären Cache-Datei); der Ordnername ist der
+// verlässlichste Ansatzpunkt, den man ohne Rätselraten am Binärformat bekommt.
+async function scanUbisoft(existingUbisoftIds: Set<string>): Promise<Candidate[]> {
+  const output = await runReg(['query', UBISOFT_INSTALLS_KEY, '/s'])
+  if (!output) return []
+
+  const candidates: Candidate[] = []
+  for (const { id, installDir } of parseUbisoftInstalls(output)) {
+    if (!existsSync(installDir)) continue
+    const exeName = findMainExecutable(installDir)
+    if (!exeName) continue
+
+    const iconHash = await ensureIconCached(join(installDir, exeName))
+    candidates.push({
+      key: `ubisoft:${id}`,
+      name: basename(installDir),
+      source: 'ubisoft',
+      path: installDir,
+      steamAppId: null,
+      epicAppName: null,
+      battlenetCode: null,
+      ubisoftId: id,
+      expectedProcessName: exeName,
+      iconHash,
+      alreadyImported: existingUbisoftIds.has(id),
+      likelyRelevant: true
+    })
+  }
+
+  return candidates
+}
+
+const EA_GAMES_KEY = 'HKLM\\SOFTWARE\\WOW6432Node\\Origin Games'
+
+// Dieselbe Aufbau-Logik wie parseUbisoftInstalls, nur dass der Schlüsselname
+// hier die alphanumerische Angebots-Id ist und der Wertname anders heißt.
+function parseEaInstalls(output: string): { offerId: string; installDir: string }[] {
+  const installs: { offerId: string; installDir: string }[] = []
+  let currentOfferId: string | null = null
+
+  for (const rawLine of output.split(/\r?\n/)) {
+    const keyMatch = rawLine.match(/\\Origin Games\\([^\\]+)\s*$/)
+    if (keyMatch) {
+      currentOfferId = keyMatch[1]
+      continue
+    }
+    const valueMatch = rawLine.match(/^ {4}Install Dir\s+REG_SZ\s+(.+)$/)
+    if (valueMatch && currentOfferId) {
+      installs.push({ offerId: currentOfferId, installDir: valueMatch[1].trim() })
+      currentOfferId = null
+    }
+  }
+
+  return installs
+}
+
+// installerdata.xml liegt bei jedem EA-/Origin-Spiel im __Installer-Unterordner
+// und nennt — anders als die Registry — den richtigen Anzeigenamen und die
+// tatsächliche Start-Datei, wichtig bei Titeln mit separatem Anti-Cheat-
+// Launcher. Bewusst mit Regex statt einem XML-Parser gelesen: weicht die
+// Struktur einmal ab, liefert das einfach nichts statt abzustürzen.
+function readEaInstallerData(installDir: string): { name: string | null; exePath: string | null } {
+  const xmlPath = join(installDir, '__Installer', 'installerdata.xml')
+  if (!existsSync(xmlPath)) return { name: null, exePath: null }
+
+  try {
+    const xml = readFileSync(xmlPath, 'utf-8')
+    const nameMatch =
+      xml.match(/<gameTitle[^>]*locale="en_US"[^>]*>([^<]+)<\/gameTitle>/) ??
+      xml.match(/<gameTitle[^>]*>([^<]+)<\/gameTitle>/)
+
+    let exePath: string | null = null
+    const filePathPattern = /<filePath>([^<]+)<\/filePath>/g
+    let match: RegExpExecArray | null
+    while ((match = filePathPattern.exec(xml))) {
+      const candidate = join(installDir, match[1].trim())
+      if (existsSync(candidate)) {
+        exePath = candidate
+        break
+      }
+    }
+
+    return { name: nameMatch ? nameMatch[1].trim() : null, exePath }
+  } catch {
+    return { name: null, exePath: null }
+  }
+}
+
+async function scanEa(existingPaths: Set<string>): Promise<Candidate[]> {
+  const output = await runReg(['query', EA_GAMES_KEY, '/s'])
+  if (!output) return []
+
+  const candidates: Candidate[] = []
+  for (const { installDir } of parseEaInstalls(output)) {
+    if (!existsSync(installDir)) continue
+
+    const { name, exePath } = readEaInstallerData(installDir)
+    let resolvedExePath = exePath
+    if (!resolvedExePath) {
+      const exeName = findMainExecutable(installDir)
+      resolvedExePath = exeName ? join(installDir, exeName) : null
+    }
+    if (!resolvedExePath) continue
+
+    const iconHash = await ensureIconCached(resolvedExePath)
+    candidates.push({
+      key: `ea:${resolvedExePath.toLowerCase()}`,
+      name: name ?? basename(installDir),
+      source: 'ea',
+      path: resolvedExePath,
+      steamAppId: null,
+      epicAppName: null,
+      battlenetCode: null,
+      ubisoftId: null,
+      expectedProcessName: basename(resolvedExePath),
+      iconHash,
+      alreadyImported: existingPaths.has(resolvedExePath),
       likelyRelevant: true
     })
   }
@@ -415,16 +572,34 @@ async function scan(): Promise<Candidate[]> {
   const existingBattlenetCodes = new Set(
     entries.map((e) => e.battlenetCode).filter((id): id is string => !!id)
   )
+  const existingUbisoftIds = new Set(
+    entries.map((e) => e.ubisoftId).filter((id): id is string => !!id)
+  )
 
-  const [registryCandidates, steamCandidates, epicCandidates, battlenetCandidates] =
-    await Promise.all([
-      scanRegistry(existingPaths),
-      scanSteam(existingSteamAppIds),
-      scanEpic(existingEpicAppNames),
-      scanBattleNet(existingBattlenetCodes)
-    ])
+  const [
+    registryCandidates,
+    steamCandidates,
+    epicCandidates,
+    battlenetCandidates,
+    ubisoftCandidates,
+    eaCandidates
+  ] = await Promise.all([
+    scanRegistry(existingPaths),
+    scanSteam(existingSteamAppIds),
+    scanEpic(existingEpicAppNames),
+    scanBattleNet(existingBattlenetCodes),
+    scanUbisoft(existingUbisoftIds),
+    scanEa(existingPaths)
+  ])
 
-  return [...steamCandidates, ...epicCandidates, ...battlenetCandidates, ...registryCandidates]
+  return [
+    ...steamCandidates,
+    ...epicCandidates,
+    ...battlenetCandidates,
+    ...ubisoftCandidates,
+    ...eaCandidates,
+    ...registryCandidates
+  ]
 }
 
 // Der Renderer schickt die zuvor per scan() gelieferten Kandidaten zurück —
@@ -441,6 +616,9 @@ async function importCandidates(candidates: Candidate[]): Promise<Entry[]> {
   const existingBattlenetCodes = new Set(
     entries.map((e) => e.battlenetCode).filter((id): id is string => !!id)
   )
+  const existingUbisoftIds = new Set(
+    entries.map((e) => e.ubisoftId).filter((id): id is string => !!id)
+  )
 
   const newEntries: Entry[] = []
   let order = nextOrder(entries) - 1000
@@ -455,6 +633,9 @@ async function importCandidates(candidates: Candidate[]): Promise<Entry[]> {
     } else if (candidate.source === 'battlenet') {
       if (!candidate.battlenetCode) continue
       if (existingBattlenetCodes.has(candidate.battlenetCode)) continue
+    } else if (candidate.source === 'ubisoft') {
+      if (!candidate.ubisoftId) continue
+      if (existingUbisoftIds.has(candidate.ubisoftId)) continue
     } else {
       if (!existsSync(candidate.path)) continue
       if (existingPaths.has(candidate.path)) continue
@@ -472,6 +653,7 @@ async function importCandidates(candidates: Candidate[]): Promise<Entry[]> {
       steamAppId: candidate.steamAppId,
       epicAppName: candidate.epicAppName,
       battlenetCode: candidate.battlenetCode,
+      ubisoftId: candidate.ubisoftId,
       favorite: false,
       expectedProcessName: candidate.expectedProcessName,
       order: (order += 1000),

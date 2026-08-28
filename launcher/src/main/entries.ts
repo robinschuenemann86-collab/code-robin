@@ -63,6 +63,7 @@ async function addEntriesFromPaths(paths: string[]): Promise<Entry[]> {
       steamAppId: null,
       epicAppName: null,
       battlenetCode: null,
+      ubisoftId: null,
       favorite: false,
       expectedProcessName: basename(resolvedPath),
       order: (order += 1000),
@@ -224,9 +225,9 @@ export async function launchEntry(id: string): Promise<void> {
   if (!entry) {
     throw new Error('Eintrag wurde nicht gefunden.')
   }
-  // Steam-, Epic- und Battle.net-Spiele laufen über den jeweiligen Client,
-  // nicht per direktem Programmstart — sonst fehlen Overlay, Cloud-Saves,
-  // Achievements und ggf. der Anti-Cheat-Unterbau.
+  // Steam-, Epic-, Battle.net- und Ubisoft-Spiele laufen über den jeweiligen
+  // Client, nicht per direktem Programmstart — sonst fehlen Overlay,
+  // Cloud-Saves, Achievements und ggf. der Anti-Cheat-Unterbau/DRM-Check.
   if (entry.steamAppId) {
     await shell.openExternal(`steam://rungameid/${entry.steamAppId}`)
   } else if (entry.epicAppName) {
@@ -235,6 +236,8 @@ export async function launchEntry(id: string): Promise<void> {
     )
   } else if (entry.battlenetCode) {
     await shell.openExternal(`battlenet://${entry.battlenetCode}`)
+  } else if (entry.ubisoftId) {
+    await shell.openExternal(`uplay://launch/${entry.ubisoftId}/0`)
   } else {
     await spawnDetached(entry.path, dirname(entry.path), parseArgs(entry.launchArgs))
   }
