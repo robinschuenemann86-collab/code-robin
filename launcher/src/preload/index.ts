@@ -79,6 +79,7 @@ const api = {
 
   getCoverArtKey: (): Promise<string | null> => ipcRenderer.invoke('coverArt:get'),
   setCoverArtKey: (key: string): Promise<void> => ipcRenderer.invoke('coverArt:set', key),
+  hasCoverArtProxy: (): Promise<boolean> => ipcRenderer.invoke('coverArt:hasProxy'),
   fetchCoverArt: (id: string): Promise<Entry[]> => ipcRenderer.invoke('coverArt:fetch', id),
   onOpenCoverArtKeyDialog: (callback: () => void): (() => void) => {
     const listener = (): void => callback()

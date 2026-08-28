@@ -3,7 +3,14 @@ import { promises as fs } from 'fs'
 import { getStore, setEntries, setSettings, type Entry } from './store'
 import { hashPath, iconFilePath, removeCachedIcon } from './icons'
 
-const API_BASE = 'https://www.steamgriddb.com/api/v2'
+const DIRECT_API_BASE = 'https://www.steamgriddb.com/api/v2'
+
+// Zur Build-Zeit fest eingebackene Adresse eines eigenen Proxys (siehe
+// metadata-proxy/ und electron.vite.config.ts) — hält den echten SteamGridDB-
+// Key serverseitig, damit nicht jeder Nutzer selbst einen anlegen muss. Ohne
+// gesetzten Proxy (leerer String im Build) bleibt alles wie zuvor: jeder
+// trägt seinen eigenen, kostenlosen Key ein.
+const METADATA_PROXY_URL = process.env.METADATA_PROXY_URL || null
 
 interface SteamGridDbSearchResult {
   success: boolean
@@ -29,10 +36,33 @@ export function setApiKey(key: string): void {
   setSettings({ ...getStore().get('settings'), steamGridDbApiKey: key.trim() })
 }
 
-async function searchGameId(name: string, apiKey: string): Promise<number | null> {
-  const response = await fetch(`${API_BASE}/search/autocomplete/${encodeURIComponent(name)}`, {
-    headers: { Authorization: `Bearer ${apiKey}` }
-  })
+// true, wenn Cover-Art überhaupt möglich ist — entweder über einen eigenen
+// Key oder über den eingebauten Proxy.
+export function canFetchCoverArt(): boolean {
+  return getApiKey() !== null || METADATA_PROXY_URL !== null
+}
+
+// Für den Hinweistext im Key-Dialog: ist ein Proxy eingebacken, ist ein
+// eigener Key nur noch optional (höhere Ratenlimits), nicht mehr nötig.
+export function hasProxyConfigured(): boolean {
+  return METADATA_PROXY_URL !== null
+}
+
+// Ein eigener, eingetragener Key hat immer Vorrang vor dem Proxy (z. B. für
+// höhere Ratenlimits) — ist keiner gesetzt, aber ein Proxy eingebacken, läuft
+// die Anfrage dort durch, ganz ohne dass die App einen Key kennt.
+async function callSteamGridDb(path: string, apiKey: string | null): Promise<Response> {
+  if (apiKey) {
+    return fetch(`${DIRECT_API_BASE}${path}`, { headers: { Authorization: `Bearer ${apiKey}` } })
+  }
+  if (METADATA_PROXY_URL) {
+    return fetch(`${METADATA_PROXY_URL}${path}`)
+  }
+  throw new Error('Kein SteamGridDB-Key hinterlegt und kein Proxy konfiguriert.')
+}
+
+async function searchGameId(name: string, apiKey: string | null): Promise<number | null> {
+  const response = await callSteamGridDb(`/search/autocomplete/${encodeURIComponent(name)}`, apiKey)
   if (response.status === 401) {
     throw new Error('SteamGridDB-Key ist ungültig.')
   }
@@ -45,10 +75,11 @@ async function searchGameId(name: string, apiKey: string): Promise<number | null
 
 // Bevorzugt das klassische Steam-Bibliotheks-Hochformat (600x900) — das
 // entspricht der großen Kachel-Darstellung, die wir im Raster zeigen wollen.
-async function fetchGridUrl(gameId: number, apiKey: string): Promise<string | null> {
-  const response = await fetch(`${API_BASE}/grids/game/${gameId}?dimensions=600x900&nsfw=false&humor=false`, {
-    headers: { Authorization: `Bearer ${apiKey}` }
-  })
+async function fetchGridUrl(gameId: number, apiKey: string | null): Promise<string | null> {
+  const response = await callSteamGridDb(
+    `/grids/game/${gameId}?dimensions=600x900&nsfw=false&humor=false`,
+    apiKey
+  )
   if (!response.ok) {
     throw new Error(`SteamGridDB antwortete mit Fehler ${response.status}.`)
   }
@@ -59,10 +90,8 @@ async function fetchGridUrl(gameId: number, apiKey: string): Promise<string | nu
 // Breites Kopfbild (wie die Hero-Grafik einer Store-Seite) — anders als das
 // Grid-Cover nicht für jedes Spiel verfügbar, deshalb hier bewusst kein Fehler
 // bei einer leeren Antwort, nur null (siehe fetchCoverArt: optional).
-async function fetchHeroUrl(gameId: number, apiKey: string): Promise<string | null> {
-  const response = await fetch(`${API_BASE}/heroes/game/${gameId}?nsfw=false&humor=false`, {
-    headers: { Authorization: `Bearer ${apiKey}` }
-  })
+async function fetchHeroUrl(gameId: number, apiKey: string | null): Promise<string | null> {
+  const response = await callSteamGridDb(`/heroes/game/${gameId}?nsfw=false&humor=false`, apiKey)
   if (!response.ok) {
     throw new Error(`SteamGridDB antwortete mit Fehler ${response.status}.`)
   }
@@ -90,7 +119,7 @@ async function downloadAndCache(entryId: string, imageUrl: string, kind: string)
 
 export async function fetchCoverArt(entryId: string): Promise<Entry[]> {
   const apiKey = getApiKey()
-  if (!apiKey) {
+  if (!apiKey && !METADATA_PROXY_URL) {
     throw new Error('Kein SteamGridDB-Key hinterlegt. Über "…" → "SteamGridDB-Key…" eintragen.')
   }
 
@@ -183,7 +212,7 @@ export async function fetchCoverArtForNewEntries(
   entryIds: string[],
   onUpdate: (entries: Entry[]) => void
 ): Promise<void> {
-  if (!getApiKey()) return
+  if (!canFetchCoverArt()) return
   for (const entryId of entryIds) {
     try {
       onUpdate(await fetchCoverArt(entryId))
@@ -198,7 +227,7 @@ export async function fetchCoverArtForNewEntries(
 // holt sie rückwirkend für alle Einträge nach, die noch keine haben, statt
 // dass man jedes einzeln über das Kontextmenü anstoßen muss.
 export async function fetchMissingCoverArtForAll(window: BrowserWindow): Promise<void> {
-  if (!getApiKey()) {
+  if (!canFetchCoverArt()) {
     window.webContents.send(
       'status:message',
       'Kein SteamGridDB-Key hinterlegt. Über "…" → "SteamGridDB-Key…" eintragen.'
@@ -240,4 +269,5 @@ export function registerCoverArtHandlers(): void {
   })
 
   ipcMain.handle('coverArt:fetch', (_event, entryId: string) => fetchCoverArt(entryId))
+  ipcMain.handle('coverArt:hasProxy', () => hasProxyConfigured())
 }

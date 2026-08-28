@@ -9,11 +9,13 @@ interface CoverArtKeyDialogProps {
 export function CoverArtKeyDialog({ onClose }: CoverArtKeyDialogProps): ReactElement {
   const [key, setKey] = useState('')
   const [saved, setSaved] = useState(false)
+  const [hasProxy, setHasProxy] = useState(false)
 
   useEscapeToClose(onClose)
 
   useEffect(() => {
     window.api.getCoverArtKey().then((existing) => setKey(existing ?? ''))
+    window.api.hasCoverArtProxy().then(setHasProxy)
   }, [])
 
   async function handleSave(): Promise<void> {
@@ -35,9 +37,15 @@ export function CoverArtKeyDialog({ onClose }: CoverArtKeyDialogProps): ReactEle
         </div>
 
         <p className="text-sm text-text-muted">
-          Wird für große Cover-Art im Raster gebraucht. Kostenlosen Key auf{' '}
-          <span className="text-gold">steamgriddb.com</span> unter Preferences → API Access
-          erstellen.
+          {hasProxy ? (
+            'Cover-Art funktioniert bereits ohne eigenen Key. Ein eigener Key ist optional, z. B. für höhere Ratenlimits.'
+          ) : (
+            <>
+              Wird für große Cover-Art im Raster gebraucht. Kostenlosen Key auf{' '}
+              <span className="text-gold">steamgriddb.com</span> unter Preferences → API Access
+              erstellen.
+            </>
+          )}
         </p>
 
         <input
