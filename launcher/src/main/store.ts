@@ -64,7 +64,9 @@ const SessionSchema = z.object({
 const SavedViewSchema = z.object({
   id: z.string(),
   name: z.string().min(1),
-  selectedTagId: z.string().nullable(),
+  selectedTagIds: z.array(z.string()).default([]),
+  tagFilterMode: z.enum(['and', 'or']).default('and'),
+  unsortedOnly: z.boolean().default(false),
   sortMode: z.enum(['name', 'recent', 'playtime', 'added', 'custom']),
   searchQuery: z.string(),
   favoritesOnly: z.boolean()

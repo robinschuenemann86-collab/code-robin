@@ -1,5 +1,5 @@
 import { useState, type ReactElement } from 'react'
-import type { Entry, SavedView, SortMode, Tag, ViewMode } from '../types'
+import type { Entry, SavedView, SortMode, Tag, TagFilterMode, ViewMode } from '../types'
 import { TAG_COLORS } from '../constants'
 import {
   IconAlertTriangle,
@@ -16,8 +16,13 @@ import {
 interface SidebarProps {
   tags: Tag[]
   entries: Entry[]
-  selectedTagId: string | null
-  onSelectTag: (id: string | null) => void
+  selectedTagIds: Set<string>
+  onToggleTagFilter: (id: string) => void
+  onClearTagFilter: () => void
+  unsortedOnly: boolean
+  onToggleUnsortedOnly: () => void
+  tagFilterMode: TagFilterMode
+  onTagFilterModeChange: (mode: TagFilterMode) => void
   searchQuery: string
   onSearchChange: (value: string) => void
   viewMode: ViewMode
@@ -51,8 +56,13 @@ const COLOR_PREVIEW: Record<string, string> = {
 export function Sidebar({
   tags,
   entries,
-  selectedTagId,
-  onSelectTag,
+  selectedTagIds,
+  onToggleTagFilter,
+  onClearTagFilter,
+  unsortedOnly,
+  onToggleUnsortedOnly,
+  tagFilterMode,
+  onTagFilterModeChange,
   searchQuery,
   onSearchChange,
   viewMode,
@@ -162,9 +172,9 @@ export function Sidebar({
 
       <div className="flex flex-col gap-1">
         <button
-          onClick={() => onSelectTag(null)}
+          onClick={onClearTagFilter}
           className={`rounded-lg px-2 py-1.5 text-left text-sm transition ${
-            selectedTagId === null
+            selectedTagIds.size === 0 && !unsortedOnly
               ? 'bg-panel-active text-text'
               : 'text-text-muted hover:bg-panel-hover hover:text-text'
           }`}
@@ -172,15 +182,36 @@ export function Sidebar({
           Alle <span className="text-text-muted">({entries.length})</span>
         </button>
         <button
-          onClick={() => onSelectTag('')}
+          onClick={onToggleUnsortedOnly}
           className={`rounded-lg px-2 py-1.5 text-left text-sm transition ${
-            selectedTagId === ''
+            unsortedOnly
               ? 'bg-panel-active text-text'
               : 'text-text-muted hover:bg-panel-hover hover:text-text'
           }`}
         >
           Unsortiert <span className="text-text-muted">({untaggedCount})</span>
         </button>
+        {selectedTagIds.size >= 2 && (
+          <div className="flex items-center gap-1.5 px-2 pt-1 text-xs text-text-muted">
+            <span>Kombinieren mit</span>
+            <button
+              onClick={() => onTagFilterModeChange('and')}
+              className={`rounded-md px-2 py-0.5 font-semibold transition ${
+                tagFilterMode === 'and' ? 'bg-panel-active text-gold' : 'hover:text-text'
+              }`}
+            >
+              UND
+            </button>
+            <button
+              onClick={() => onTagFilterModeChange('or')}
+              className={`rounded-md px-2 py-0.5 font-semibold transition ${
+                tagFilterMode === 'or' ? 'bg-panel-active text-gold' : 'hover:text-text'
+              }`}
+            >
+              ODER
+            </button>
+          </div>
+        )}
         {missingCount > 0 && (
           <button
             onClick={() => onMissingOnlyChange(!missingOnly)}
@@ -262,7 +293,7 @@ export function Sidebar({
             const nextColorPreview = nextIsAuto
               ? TAG_COLORS[index % TAG_COLORS.length]
               : TAG_COLORS[currentColorIndex + 1]
-            const active = selectedTagId === tag.id
+            const active = selectedTagIds.has(tag.id)
 
             if (isEditing) {
               return (
@@ -288,7 +319,7 @@ export function Sidebar({
                   active ? 'ring-2 ring-text/60' : 'opacity-90 hover:opacity-100'
                 }`}
               >
-                <button onClick={() => onSelectTag(tag.id)} className="truncate">
+                <button onClick={() => onToggleTagFilter(tag.id)} className="truncate">
                   {tag.name} <span className="opacity-70">({count})</span>
                 </button>
                 <button

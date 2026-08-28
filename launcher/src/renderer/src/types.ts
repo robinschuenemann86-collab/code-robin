@@ -26,10 +26,14 @@ export type ViewMode = 'grid' | 'list'
 
 export type SortMode = 'name' | 'recent' | 'playtime' | 'added' | 'custom'
 
+export type TagFilterMode = 'and' | 'or'
+
 export interface SavedView {
   id: string
   name: string
-  selectedTagId: string | null
+  selectedTagIds: string[]
+  tagFilterMode: TagFilterMode
+  unsortedOnly: boolean
   sortMode: SortMode
   searchQuery: string
   favoritesOnly: boolean

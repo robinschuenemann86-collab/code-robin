@@ -6,7 +6,16 @@ import {
   type MouseEvent as ReactMouseEvent,
   type ReactElement
 } from 'react'
-import type { Entry, EntryStats, OverviewData, SavedView, SortMode, Tag, ViewMode } from './types'
+import type {
+  Entry,
+  EntryStats,
+  OverviewData,
+  SavedView,
+  SortMode,
+  Tag,
+  TagFilterMode,
+  ViewMode
+} from './types'
 import type { UpdaterStatus } from '../../main/updater'
 import { TAG_COLORS } from './constants'
 import { EntryIcon } from './components/EntryIcon'
@@ -55,7 +64,9 @@ function App(): ReactElement {
   const [bigPictureMode, setBigPictureMode] = useState(false)
 
   const [searchQuery, setSearchQuery] = useState('')
-  const [selectedTagId, setSelectedTagId] = useState<string | null>(null)
+  const [selectedTagIds, setSelectedTagIds] = useState<Set<string>>(new Set())
+  const [tagFilterMode, setTagFilterMode] = useState<TagFilterMode>('and')
+  const [unsortedOnly, setUnsortedOnly] = useState(false)
   const [favoritesOnly, setFavoritesOnly] = useState(false)
   const [missingOnly, setMissingOnly] = useState(false)
   const [viewMode, setViewMode] = useState<ViewMode>('grid')
@@ -165,9 +176,14 @@ function App(): ReactElement {
     const filtered = entries.filter((entry) => {
       if (favoritesOnly && !entry.favorite) return false
       if (missingOnly && !missingPaths.has(entry.id)) return false
-      if (selectedTagId === '' && entry.tags.length > 0) return false
-      if (selectedTagId && selectedTagId !== '' && !entry.tags.includes(selectedTagId))
-        return false
+      if (unsortedOnly && entry.tags.length > 0) return false
+      if (selectedTagIds.size > 0) {
+        const matches =
+          tagFilterMode === 'and'
+            ? [...selectedTagIds].every((id) => entry.tags.includes(id))
+            : [...selectedTagIds].some((id) => entry.tags.includes(id))
+        if (!matches) return false
+      }
       if (query && !entry.name.toLowerCase().includes(query)) return false
       return true
     })
@@ -192,21 +208,32 @@ function App(): ReactElement {
           return b.addedAt - a.addedAt
       }
     })
-  }, [entries, searchQuery, selectedTagId, favoritesOnly, missingOnly, missingPaths, sortMode, stats])
+  }, [
+    entries,
+    searchQuery,
+    selectedTagIds,
+    tagFilterMode,
+    unsortedOnly,
+    favoritesOnly,
+    missingOnly,
+    missingPaths,
+    sortMode,
+    stats
+  ])
 
   const selectedEntry = entries.find((e) => e.id === selectedEntryId) ?? null
 
   // Nur im ungefilterten Grundzustand zeigen — sonst wirkt es wie eine zweite,
   // widersprüchliche Liste neben den gerade gefilterten Ergebnissen.
   const recentlyPlayed = useMemo(() => {
-    if (searchQuery.trim() || selectedTagId !== null || favoritesOnly) return []
+    if (searchQuery.trim() || selectedTagIds.size > 0 || unsortedOnly || favoritesOnly) return []
     return stats
       .filter((s) => s.lastPlayedAt !== null)
       .sort((a, b) => (b.lastPlayedAt ?? 0) - (a.lastPlayedAt ?? 0))
       .slice(0, 6)
       .map((s) => entries.find((e) => e.id === s.entryId))
       .filter((e): e is Entry => e !== undefined)
-  }, [stats, entries, searchQuery, selectedTagId, favoritesOnly])
+  }, [stats, entries, searchQuery, selectedTagIds, unsortedOnly, favoritesOnly])
 
   async function handleAdd(): Promise<void> {
     const updated = await window.api.addEntryViaDialog()
@@ -380,21 +407,56 @@ function App(): ReactElement {
     if (tag && !window.confirm(`Tag "${tag.name}" löschen?`)) return
     setTags(await window.api.removeTag(id))
     setEntries(await window.api.listEntries())
-    if (selectedTagId === id) setSelectedTagId(null)
+    setSelectedTagIds((prev) => {
+      if (!prev.has(id)) return prev
+      const next = new Set(prev)
+      next.delete(id)
+      return next
+    })
   }
 
   async function handleCycleTagColor(id: string): Promise<void> {
     setTags(await window.api.cycleTagColor(id, TAG_COLORS))
   }
 
+  function handleToggleTagFilter(id: string): void {
+    setUnsortedOnly(false)
+    setSelectedTagIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  function handleToggleUnsortedOnly(): void {
+    setSelectedTagIds(new Set())
+    setUnsortedOnly((prev) => !prev)
+  }
+
+  function handleClearTagFilter(): void {
+    setSelectedTagIds(new Set())
+    setUnsortedOnly(false)
+  }
+
   async function handleSaveCurrentView(name: string): Promise<void> {
     setSavedViews(
-      await window.api.addSavedView({ name, selectedTagId, sortMode, searchQuery, favoritesOnly })
+      await window.api.addSavedView({
+        name,
+        selectedTagIds: [...selectedTagIds],
+        tagFilterMode,
+        unsortedOnly,
+        sortMode,
+        searchQuery,
+        favoritesOnly
+      })
     )
   }
 
   function handleApplyView(view: SavedView): void {
-    setSelectedTagId(view.selectedTagId)
+    setSelectedTagIds(new Set(view.selectedTagIds))
+    setTagFilterMode(view.tagFilterMode)
+    setUnsortedOnly(view.unsortedOnly)
     setSortMode(view.sortMode)
     setSearchQuery(view.searchQuery)
     setFavoritesOnly(view.favoritesOnly)
@@ -472,7 +534,8 @@ function App(): ReactElement {
 
   function resetFilters(): void {
     setSearchQuery('')
-    setSelectedTagId(null)
+    setSelectedTagIds(new Set())
+    setUnsortedOnly(false)
     setFavoritesOnly(false)
     setMissingOnly(false)
   }
@@ -589,8 +652,13 @@ function App(): ReactElement {
         <Sidebar
           tags={tags}
           entries={entries}
-          selectedTagId={selectedTagId}
-          onSelectTag={setSelectedTagId}
+          selectedTagIds={selectedTagIds}
+          onToggleTagFilter={handleToggleTagFilter}
+          onClearTagFilter={handleClearTagFilter}
+          unsortedOnly={unsortedOnly}
+          onToggleUnsortedOnly={handleToggleUnsortedOnly}
+          tagFilterMode={tagFilterMode}
+          onTagFilterModeChange={setTagFilterMode}
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
           viewMode={viewMode}
