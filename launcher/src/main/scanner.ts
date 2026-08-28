@@ -11,7 +11,7 @@ import { fetchCoverArtForNewEntries } from './coverArt'
 export interface Candidate {
   key: string
   name: string
-  source: 'registry' | 'steam' | 'epic' | 'battlenet' | 'ubisoft' | 'ea'
+  source: 'registry' | 'steam' | 'epic' | 'battlenet' | 'ubisoft' | 'ea' | 'gog'
   path: string
   steamAppId: string | null
   epicAppName: string | null
@@ -560,6 +560,87 @@ async function scanEa(existingPaths: Set<string>): Promise<Candidate[]> {
   return candidates
 }
 
+const GOG_GAMES_KEY = 'HKLM\\SOFTWARE\\WOW6432Node\\GOG.com\\Games'
+
+interface GogRecord {
+  gameName?: string
+  path?: string
+  exe?: string
+}
+
+// GOG Galaxy legt pro Spiel einen eigenen Unterschlüssel mit mehreren Werten
+// in beliebiger Reihenfolge an (anders als bei Ubisoft/EA reicht daher kein
+// einfaches "nächste Zeile ist der Wert") — hier wird wie beim generischen
+// Registry-Scan blockweise gesammelt, bis der nächste Unterschlüssel beginnt.
+// Groß-/Kleinschreibung der Wertnamen ist in der Praxis nicht hundertprozentig
+// verlässlich dokumentiert — deshalb hier bewusst case-insensitiv abgeglichen,
+// statt uns auf eine bestimmte Schreibweise zu verlassen.
+const GOG_VALUE_KEYS: Record<string, keyof GogRecord> = {
+  gamename: 'gameName',
+  path: 'path',
+  exe: 'exe'
+}
+
+function parseGogInstalls(output: string): GogRecord[] {
+  const records: GogRecord[] = []
+  let current: GogRecord | null = null
+
+  for (const rawLine of output.split(/\r?\n/)) {
+    if (/^[A-Z]/.test(rawLine)) {
+      current = {}
+      records.push(current)
+      continue
+    }
+    const match = rawLine.match(/^ {4}(\w+)\s{2,}(REG_\w+)\s{2,}(.*)$/i)
+    if (match && current) {
+      const [, name, , value] = match
+      const key = GOG_VALUE_KEYS[name.toLowerCase()]
+      if (key) current[key] = value.trim()
+    }
+  }
+
+  return records
+}
+
+// GOG-Spiele sind DRM-frei und laufen direkt über ihre EXE, ohne Client im
+// Hintergrund und ohne eigenes URI-Startschema — im Gegensatz zu Steam/Epic/
+// Battle.net/Ubisoft ist hier also kein Login und kein spezieller Start-Weg
+// nötig, nur die Installationsdaten aus der Registry.
+async function scanGog(existingPaths: Set<string>): Promise<Candidate[]> {
+  const output = await runReg(['query', GOG_GAMES_KEY, '/s'])
+  if (!output) return []
+
+  const candidates: Candidate[] = []
+  for (const record of parseGogInstalls(output)) {
+    if (!record.path || !existsSync(record.path)) continue
+
+    let exePath = record.exe && existsSync(record.exe) ? record.exe : null
+    if (!exePath) {
+      const exeName = findMainExecutable(record.path)
+      exePath = exeName ? join(record.path, exeName) : null
+    }
+    if (!exePath) continue
+
+    const iconHash = await ensureIconCached(exePath)
+    candidates.push({
+      key: `gog:${exePath.toLowerCase()}`,
+      name: record.gameName ?? basename(record.path),
+      source: 'gog',
+      path: exePath,
+      steamAppId: null,
+      epicAppName: null,
+      battlenetCode: null,
+      ubisoftId: null,
+      expectedProcessName: basename(exePath),
+      iconHash,
+      alreadyImported: existingPaths.has(exePath),
+      likelyRelevant: true
+    })
+  }
+
+  return candidates
+}
+
 async function scan(): Promise<Candidate[]> {
   const entries = getStore().get('entries')
   const existingPaths = new Set(entries.map((e) => e.path))
@@ -582,14 +663,16 @@ async function scan(): Promise<Candidate[]> {
     epicCandidates,
     battlenetCandidates,
     ubisoftCandidates,
-    eaCandidates
+    eaCandidates,
+    gogCandidates
   ] = await Promise.all([
     scanRegistry(existingPaths),
     scanSteam(existingSteamAppIds),
     scanEpic(existingEpicAppNames),
     scanBattleNet(existingBattlenetCodes),
     scanUbisoft(existingUbisoftIds),
-    scanEa(existingPaths)
+    scanEa(existingPaths),
+    scanGog(existingPaths)
   ])
 
   return [
@@ -598,6 +681,7 @@ async function scan(): Promise<Candidate[]> {
     ...battlenetCandidates,
     ...ubisoftCandidates,
     ...eaCandidates,
+    ...gogCandidates,
     ...registryCandidates
   ]
 }

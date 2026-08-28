@@ -38,7 +38,7 @@ export interface SavedView {
 export interface Candidate {
   key: string
   name: string
-  source: 'registry' | 'steam' | 'epic' | 'battlenet' | 'ubisoft' | 'ea'
+  source: 'registry' | 'steam' | 'epic' | 'battlenet' | 'ubisoft' | 'ea' | 'gog'
   path: string
   steamAppId: string | null
   epicAppName: string | null
