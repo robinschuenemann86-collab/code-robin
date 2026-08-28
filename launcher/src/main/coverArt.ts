@@ -61,6 +61,45 @@ async function callSteamGridDb(path: string, apiKey: string | null): Promise<Res
   throw new Error('Kein SteamGridDB-Key hinterlegt und kein Proxy konfiguriert.')
 }
 
+const MATCH_STOPWORDS = new Set([
+  'the',
+  'a',
+  'an',
+  'of',
+  'and',
+  'edition',
+  'remastered',
+  'goty',
+  'definitive'
+])
+
+function significantWords(name: string): Set<string> {
+  return new Set(
+    name
+      .toLowerCase()
+      .replace(/[™®©]/g, '')
+      .replace(/[^a-z0-9]+/g, ' ')
+      .split(' ')
+      // length > 0 statt > 1 — sonst fallen einstellige Fortsetzungsnummern
+      // ("Portal 2", "Half-Life 2") raus, obwohl die gerade entscheidend sind.
+      .filter((word) => word.length > 0 && !MATCH_STOPWORDS.has(word))
+  )
+}
+
+// Ein einzelnes, langes gemeinsames Wort reicht nicht als Beleg für einen
+// Treffer — sonst würde z. B. "UTW Beginnings" auf ein unverwandtes "Bigger
+// Beginnings" passen, nur weil beide "beginnings" enthalten. Verlangt
+// stattdessen eine Mehrheits-Übereinstimmung der bedeutungstragenden Wörter
+// in beide Richtungen (Jaccard-Ähnlichkeit).
+function namesLikelyMatch(searched: string, candidate: string): boolean {
+  const a = significantWords(searched)
+  const b = significantWords(candidate)
+  if (a.size === 0 || b.size === 0) return true
+  const intersection = [...a].filter((word) => b.has(word)).length
+  const union = new Set([...a, ...b]).size
+  return intersection / union >= 0.5
+}
+
 async function searchGameId(name: string, apiKey: string | null): Promise<number | null> {
   const response = await callSteamGridDb(`/search/autocomplete/${encodeURIComponent(name)}`, apiKey)
   if (response.status === 401) {
@@ -70,7 +109,11 @@ async function searchGameId(name: string, apiKey: string | null): Promise<number
     throw new Error(`SteamGridDB antwortete mit Fehler ${response.status}.`)
   }
   const body = (await response.json()) as SteamGridDbSearchResult
-  return body.data?.[0]?.id ?? null
+  // Nicht blind den ersten Treffer nehmen — SteamGridDBs Rangfolge bleibt
+  // maßgeblich, aber ein Treffer, dessen Name kaum etwas mit dem gesuchten
+  // Namen zu tun hat, wird übersprungen statt falsche Cover-Art zu laden.
+  const match = body.data?.find((candidate) => namesLikelyMatch(name, candidate.name))
+  return match?.id ?? null
 }
 
 // Bevorzugt das klassische Steam-Bibliotheks-Hochformat (600x900) — das
