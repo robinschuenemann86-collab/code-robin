@@ -164,6 +164,7 @@ export function Sidebar({
         <option value="name">Name (A-Z)</option>
         <option value="recent">Zuletzt gespielt</option>
         <option value="playtime">Spielzeit</option>
+        <option value="rating">Bewertung</option>
         <option value="custom">Eigene Reihenfolge</option>
       </select>
       {sortMode === 'custom' && (

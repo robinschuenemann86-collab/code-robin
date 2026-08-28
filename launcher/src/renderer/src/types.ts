@@ -12,6 +12,7 @@ export interface Entry {
   battlenetCode: string | null
   ubisoftId: string | null
   favorite: boolean
+  rating: number
   order: number
   launchArgs: string | null
 }
@@ -24,7 +25,7 @@ export interface Tag {
 
 export type ViewMode = 'grid' | 'list'
 
-export type SortMode = 'name' | 'recent' | 'playtime' | 'added' | 'custom'
+export type SortMode = 'name' | 'recent' | 'playtime' | 'added' | 'custom' | 'rating'
 
 export type TagFilterMode = 'and' | 'or'
 

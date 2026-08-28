@@ -34,6 +34,7 @@ interface DetailPanelProps {
   onChangeIcon: (id: string) => void
   onFetchCoverArt: (id: string) => void
   onToggleFavorite: (entry: Entry) => void
+  onSetRating: (id: string, rating: number) => void
   onRemove: (entry: Entry) => void
   onClose: () => void
 }
@@ -58,6 +59,7 @@ export function DetailPanel({
   onChangeIcon,
   onFetchCoverArt,
   onToggleFavorite,
+  onSetRating,
   onRemove,
   onClose
 }: DetailPanelProps): ReactElement {
@@ -162,6 +164,18 @@ export function DetailPanel({
             {entry.name} <IconEdit className="h-3 w-3 text-text-muted" />
           </button>
         )}
+        <div className="flex items-center gap-1">
+          {[1, 2, 3, 4, 5].map((value) => (
+            <button
+              key={value}
+              onClick={() => onSetRating(entry.id, entry.rating === value ? 0 : value)}
+              title={`${value} von 5 Sternen`}
+              className={value <= entry.rating ? 'text-amber' : 'text-text-muted hover:text-amber'}
+            >
+              <IconStar className="h-3.5 w-3.5" filled={value <= entry.rating} />
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="flex items-start gap-2">

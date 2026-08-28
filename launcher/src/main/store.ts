@@ -29,6 +29,9 @@ const EntrySchema = z.object({
   // dem Registry-Schlüssel HKLM\...\Ubisoft\Launcher\Installs\<id>.
   ubisoftId: z.string().nullable().default(null),
   favorite: z.boolean().default(false),
+  // Eigene 1-5-Sterne-Bewertung, unabhängig vom Favoriten-Stern. 0 = noch
+  // nicht bewertet.
+  rating: z.number().int().min(0).max(5).default(0),
   // Prozessname (z. B. "Game.exe"), auf den beim Spielzeit-Tracking gepollt wird.
   // Ohne diesen Wert kann keine Spielzeit erfasst werden (siehe playtime.ts).
   expectedProcessName: z.string().nullable().default(null),
@@ -75,7 +78,7 @@ const SavedViewSchema = z.object({
   selectedTagIds: z.array(z.string()).default([]),
   tagFilterMode: z.enum(['and', 'or']).default('and'),
   unsortedOnly: z.boolean().default(false),
-  sortMode: z.enum(['name', 'recent', 'playtime', 'added', 'custom']),
+  sortMode: z.enum(['name', 'recent', 'playtime', 'added', 'custom', 'rating']),
   searchQuery: z.string(),
   favoritesOnly: z.boolean()
 })

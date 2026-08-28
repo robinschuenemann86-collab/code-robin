@@ -14,6 +14,7 @@ export interface LauncherApi {
   launchEntry: (id: string) => Promise<void>
   getEntrySize: (id: string) => Promise<number | null>
   toggleFavorite: (id: string) => Promise<Entry[]>
+  setRating: (id: string, rating: number) => Promise<Entry[]>
   bulkSetFavorite: (ids: string[], favorite: boolean) => Promise<Entry[]>
   bulkAddTag: (ids: string[], tagId: string) => Promise<Entry[]>
   bulkRemoveEntries: (ids: string[]) => Promise<Entry[]>

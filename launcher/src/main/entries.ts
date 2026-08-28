@@ -66,6 +66,7 @@ async function addEntriesFromPaths(paths: string[]): Promise<Entry[]> {
       battlenetCode: null,
       ubisoftId: null,
       favorite: false,
+      rating: 0,
       expectedProcessName: basename(resolvedPath),
       order: (order += 1000),
       launchArgs: null
@@ -171,6 +172,21 @@ function moveEntry(id: string, targetId: string | null, position: 'before' | 'af
   const renumbered = sorted.map((entry, index) => ({ ...entry, order: (index + 1) * 1000 }))
   setEntries(renumbered)
   return renumbered
+}
+
+export function setRating(id: string, rating: number): Entry[] {
+  if (!Number.isInteger(rating) || rating < 0 || rating > 5) {
+    throw new Error('Bewertung muss zwischen 0 und 5 liegen.')
+  }
+  const entries = getStore().get('entries')
+  const index = entries.findIndex((entry) => entry.id === id)
+  if (index === -1) {
+    throw new Error('Eintrag wurde nicht gefunden.')
+  }
+  const updated = [...entries]
+  updated[index] = { ...updated[index], rating }
+  setEntries(updated)
+  return updated
 }
 
 export function toggleFavorite(id: string): Entry[] {
@@ -448,6 +464,10 @@ export function registerEntryHandlers(getWindow: () => BrowserWindow | null): vo
   )
 
   ipcMain.handle('entries:toggleFavorite', (_event, id: string) => toggleFavorite(id))
+
+  ipcMain.handle('entries:setRating', (_event, id: string, rating: number) =>
+    setRating(id, rating)
+  )
 
   ipcMain.handle('entries:remove', (_event, id: string) => removeEntry(id))
 

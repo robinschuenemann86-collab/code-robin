@@ -209,6 +209,8 @@ function App(): ReactElement {
           )
         case 'custom':
           return a.order - b.order
+        case 'rating':
+          return b.rating - a.rating
         case 'added':
         default:
           return b.addedAt - a.addedAt
@@ -285,6 +287,10 @@ function App(): ReactElement {
 
   async function handleToggleFavorite(entry: Entry): Promise<void> {
     setEntries(await window.api.toggleFavorite(entry.id))
+  }
+
+  async function handleSetRating(id: string, rating: number): Promise<void> {
+    setEntries(await window.api.setRating(id, rating))
   }
 
   function handleDelete(entry: Entry): void {
@@ -1011,6 +1017,7 @@ function App(): ReactElement {
             onChangeIcon={handleChangeIcon}
             onFetchCoverArt={handleFetchCoverArt}
             onToggleFavorite={handleToggleFavorite}
+            onSetRating={handleSetRating}
             onRemove={handleDelete}
             onClose={() => setSelectedEntryId(null)}
           />

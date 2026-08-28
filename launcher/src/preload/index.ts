@@ -22,6 +22,8 @@ const api = {
   getEntrySize: (id: string): Promise<number | null> => ipcRenderer.invoke('entries:getSize', id),
   toggleFavorite: (id: string): Promise<Entry[]> =>
     ipcRenderer.invoke('entries:toggleFavorite', id),
+  setRating: (id: string, rating: number): Promise<Entry[]> =>
+    ipcRenderer.invoke('entries:setRating', id, rating),
   bulkSetFavorite: (ids: string[], favorite: boolean): Promise<Entry[]> =>
     ipcRenderer.invoke('entries:bulkSetFavorite', ids, favorite),
   bulkAddTag: (ids: string[], tagId: string): Promise<Entry[]> =>
