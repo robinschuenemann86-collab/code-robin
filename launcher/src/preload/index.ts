@@ -66,6 +66,8 @@ const api = {
   getRunningEntries: (): Promise<string[]> => ipcRenderer.invoke('stats:runningEntries'),
   setWeeklyGoal: (minutes: number | null): Promise<void> =>
     ipcRenderer.invoke('stats:setWeeklyGoal', minutes),
+  setBreakReminder: (minutes: number | null): Promise<void> =>
+    ipcRenderer.invoke('stats:setBreakReminder', minutes),
 
   onUpdaterStatus: (callback: (status: UpdaterStatus) => void): (() => void) => {
     const listener = (_event: unknown, status: UpdaterStatus): void => callback(status)

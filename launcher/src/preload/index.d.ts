@@ -42,6 +42,7 @@ export interface LauncherApi {
   getEntrySessions: (id: string) => Promise<Session[]>
   getRunningEntries: () => Promise<string[]>
   setWeeklyGoal: (minutes: number | null) => Promise<void>
+  setBreakReminder: (minutes: number | null) => Promise<void>
 
   onUpdaterStatus: (callback: (status: UpdaterStatus) => void) => () => void
   installUpdate: () => Promise<void>

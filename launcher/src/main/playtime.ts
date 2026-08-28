@@ -1,6 +1,7 @@
 import { spawn } from 'child_process'
 import { randomUUID } from 'crypto'
-import { getStore, setSessionArchive, setSessions, type Session } from './store'
+import { Notification } from 'electron'
+import { getStore, setSessionArchive, setSessions, setSettings, type Session } from './store'
 import { clearDiscordPresence } from './discordPresence'
 
 const POLL_INTERVAL_MS = 15_000
@@ -15,8 +16,21 @@ const MAX_SESSIONS_PER_ENTRY = 200
 
 // Reine In-Memory-Zähler pro laufender Sitzung — müssen die App-Laufzeit nicht
 // überleben, da beim Start ohnehin alle offenen Sitzungen geschlossen werden.
-const tracking = new Map<string, { misses: number; everSeen: boolean }>()
+// reminderCount zählt, wie oft für diese Sitzung schon eine Pausen-Erinnerung
+// gezeigt wurde, damit dieselbe Schwelle nicht bei jedem Poll erneut auslöst.
+const tracking = new Map<string, { misses: number; everSeen: boolean; reminderCount: number }>()
 let pollHandle: ReturnType<typeof setInterval> | null = null
+
+// Optionale Erinnerung nach X Minuten ununterbrochenem Spielen, 0/null =
+// deaktiviert (Standard) — MR Launch meldet sich sonst nie von sich aus.
+export function getBreakReminderMinutes(): number | null {
+  const value = getStore().get('settings').breakReminderMinutes
+  return typeof value === 'number' && value > 0 ? value : null
+}
+
+export function setBreakReminderMinutes(minutes: number | null): void {
+  setSettings({ ...getStore().get('settings'), breakReminderMinutes: minutes })
+}
 
 function getRunningProcessNames(): Promise<Set<string>> {
   return new Promise((resolve) => {
@@ -103,6 +117,7 @@ async function pollTick(): Promise<void> {
   const entries = getStore().get('entries')
   const runningNames = await getRunningProcessNames()
   const now = Date.now()
+  const reminderMinutes = getBreakReminderMinutes()
   let changed = false
 
   const updated = sessions.map((session) => {
@@ -110,13 +125,28 @@ async function pollTick(): Promise<void> {
 
     const entry = entries.find((e) => e.id === session.entryId)
     const expectedName = entry?.expectedProcessName?.toLowerCase() ?? null
-    const state = tracking.get(session.id) ?? { misses: 0, everSeen: false }
+    const state = tracking.get(session.id) ?? { misses: 0, everSeen: false, reminderCount: 0 }
 
     const isRunning = expectedName !== null && runningNames.has(expectedName)
 
     if (isRunning) {
       state.everSeen = true
       state.misses = 0
+
+      // Löst nur beim Überschreiten einer neuen Vielfachen aus (reminderCount
+      // steigt), nicht bei jedem 15s-Poll erneut — sonst würde ab der ersten
+      // Schwelle alle 15 Sekunden eine neue Benachrichtigung aufpoppen.
+      if (reminderMinutes) {
+        const dueCount = Math.floor((now - session.startedAt) / (reminderMinutes * 60_000))
+        if (dueCount > state.reminderCount) {
+          state.reminderCount = dueCount
+          new Notification({
+            title: 'MR Launch',
+            body: `Du spielst seit ${reminderMinutes * dueCount} Minuten am Stück "${entry?.name ?? 'diesem Programm'}" — Zeit für eine Pause?`
+          }).show()
+        }
+      }
+
       tracking.set(session.id, state)
       return session
     }
@@ -170,6 +200,6 @@ export function startSession(entryId: string, expectedProcessName: string | null
     endedAt: null
   }
   setSessions([...sessions, session])
-  tracking.set(session.id, { misses: 0, everSeen: false })
+  tracking.set(session.id, { misses: 0, everSeen: false, reminderCount: 0 })
   ensurePolling()
 }

@@ -1,5 +1,6 @@
 import { ipcMain } from 'electron'
 import { getStore, setSettings, type Session } from './store'
+import { getBreakReminderMinutes, setBreakReminderMinutes } from './playtime'
 
 export interface EntryStats {
   entryId: string
@@ -58,6 +59,8 @@ export interface OverviewData {
   recentSessions: { entryId: string; endedAt: number; durationMs: number }[]
   // Selbst gesetztes Wochenziel in Minuten, null wenn keins gesetzt ist.
   weeklyGoalMinutes: number | null
+  // Optionale Pausen-Erinnerung in Minuten, null wenn keine gesetzt ist.
+  breakReminderMinutes: number | null
 }
 
 export function getWeeklyGoalMinutes(): number | null {
@@ -136,7 +139,8 @@ function computeOverview(): OverviewData {
     playedThisWeekMs,
     totalLaunches,
     recentSessions: recentSessions.slice(0, 6),
-    weeklyGoalMinutes: getWeeklyGoalMinutes()
+    weeklyGoalMinutes: getWeeklyGoalMinutes(),
+    breakReminderMinutes: getBreakReminderMinutes()
   }
 }
 
@@ -183,5 +187,8 @@ export function registerStatsHandlers(): void {
   ipcMain.handle('stats:runningEntries', () => getRunningEntryIds())
   ipcMain.handle('stats:setWeeklyGoal', (_event, minutes: number | null) =>
     setWeeklyGoalMinutes(minutes)
+  )
+  ipcMain.handle('stats:setBreakReminder', (_event, minutes: number | null) =>
+    setBreakReminderMinutes(minutes)
   )
 }

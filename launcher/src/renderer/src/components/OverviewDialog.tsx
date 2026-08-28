@@ -9,6 +9,7 @@ interface OverviewDialogProps {
   stats: EntryStats[]
   overview: OverviewData
   onSetGoal: (minutes: number | null) => void
+  onSetBreakReminder: (minutes: number | null) => void
   onClose: () => void
 }
 
@@ -40,12 +41,17 @@ export function OverviewDialog({
   stats,
   overview,
   onSetGoal,
+  onSetBreakReminder,
   onClose
 }: OverviewDialogProps): ReactElement {
   useEscapeToClose(onClose)
   const [editingGoal, setEditingGoal] = useState(false)
   const [goalHours, setGoalHours] = useState(
     overview.weeklyGoalMinutes ? String(overview.weeklyGoalMinutes / 60) : ''
+  )
+  const [editingReminder, setEditingReminder] = useState(false)
+  const [reminderMinutes, setReminderMinutes] = useState(
+    overview.breakReminderMinutes ? String(overview.breakReminderMinutes) : ''
   )
   const thisWeek = overview.weekActivity.slice(21, 28)
   const daysActive = thisWeek.filter((d) => d === true).length
@@ -55,6 +61,12 @@ export function OverviewDialog({
     const hours = parseFloat(goalHours.replace(',', '.'))
     onSetGoal(Number.isFinite(hours) && hours > 0 ? Math.round(hours * 60) : null)
     setEditingGoal(false)
+  }
+
+  function commitReminder(): void {
+    const minutes = parseInt(reminderMinutes, 10)
+    onSetBreakReminder(Number.isFinite(minutes) && minutes > 0 ? minutes : null)
+    setEditingReminder(false)
   }
 
   const mostPlayed = useMemo(() => {
@@ -203,6 +215,50 @@ export function OverviewDialog({
                 <div className="text-xl font-extrabold">{overview.totalLaunches}</div>
                 <div className="text-xs font-semibold text-text-muted">Starts insgesamt</div>
               </div>
+            </div>
+            <div className="flex items-center justify-between rounded-xl border border-border bg-panel px-5 py-3">
+              {editingReminder ? (
+                <div className="flex items-center gap-1.5">
+                  <input
+                    autoFocus
+                    type="number"
+                    min="0"
+                    step="5"
+                    value={reminderMinutes}
+                    onChange={(e) => setReminderMinutes(e.target.value)}
+                    onBlur={commitReminder}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') commitReminder()
+                      if (e.key === 'Escape') setEditingReminder(false)
+                    }}
+                    placeholder="Min."
+                    className="w-16 rounded-lg border border-border bg-panel-hover px-2 py-1 text-sm text-text outline-none focus:border-gold/50"
+                  />
+                  <span className="text-xs text-text-muted">Min. am Stück</span>
+                </div>
+              ) : overview.breakReminderMinutes ? (
+                <button
+                  onClick={() => {
+                    setReminderMinutes(String(overview.breakReminderMinutes))
+                    setEditingReminder(true)
+                  }}
+                  className="group flex flex-col gap-0.5 text-left"
+                >
+                  <div className="text-xl font-extrabold group-hover:text-gold">
+                    {overview.breakReminderMinutes} Min.
+                  </div>
+                  <div className="flex items-center gap-1 text-xs font-semibold text-text-muted">
+                    Pausen-Erinnerung <IconEdit className="h-3 w-3" />
+                  </div>
+                </button>
+              ) : (
+                <button
+                  onClick={() => setEditingReminder(true)}
+                  className="text-left text-xs font-semibold text-gold hover:brightness-125"
+                >
+                  + Pausen-Erinnerung setzen
+                </button>
+              )}
             </div>
           </div>
         </div>

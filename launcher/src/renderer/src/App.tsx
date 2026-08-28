@@ -175,6 +175,11 @@ function App(): ReactElement {
     setOverview(await window.api.getOverview())
   }
 
+  async function handleSetBreakReminder(minutes: number | null): Promise<void> {
+    await window.api.setBreakReminder(minutes)
+    setOverview(await window.api.getOverview())
+  }
+
   const filteredEntries = useMemo(() => {
     const query = searchQuery.trim().toLowerCase()
     const statsByEntry = new Map(stats.map((s) => [s.entryId, s]))
@@ -1100,6 +1105,7 @@ function App(): ReactElement {
           stats={stats}
           overview={overview}
           onSetGoal={handleSetWeeklyGoal}
+          onSetBreakReminder={handleSetBreakReminder}
           onClose={() => setOverviewOpen(false)}
         />
       )}

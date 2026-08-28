@@ -74,4 +74,5 @@ export interface OverviewData {
   totalLaunches: number
   recentSessions: { entryId: string; endedAt: number; durationMs: number }[]
   weeklyGoalMinutes: number | null
+  breakReminderMinutes: number | null
 }
