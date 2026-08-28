@@ -1,4 +1,11 @@
-import { useEffect, useMemo, useState, type DragEvent, type ReactElement } from 'react'
+import {
+  useEffect,
+  useMemo,
+  useState,
+  type DragEvent,
+  type MouseEvent as ReactMouseEvent,
+  type ReactElement
+} from 'react'
 import type { Entry, EntryStats, OverviewData, SavedView, SortMode, Tag, ViewMode } from './types'
 import type { UpdaterStatus } from '../../main/updater'
 import { TAG_COLORS } from './constants'
@@ -60,6 +67,8 @@ function App(): ReactElement {
   const [dragOverEntryId, setDragOverEntryId] = useState<string | null>(null)
   const [runningIds, setRunningIds] = useState<Set<string>>(new Set())
   const [savedViews, setSavedViews] = useState<SavedView[]>([])
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [lastClickedIndex, setLastClickedIndex] = useState<number | null>(null)
 
   useEffect(() => {
     window.api.listSavedViews().then(setSavedViews)
@@ -272,6 +281,54 @@ function App(): ReactElement {
     }
   }
 
+  // Normaler Klick wählt wie bisher genau ein Programm für das Detail-Panel.
+  // Strg+Klick schaltet ein Programm in der Mehrfachauswahl um, Umschalt+Klick
+  // markiert einen ganzen Bereich ab dem zuletzt angeklickten Programm — beides
+  // schließt das Detail-Panel, da beide Ansichten (Detail vs. Sammelaktionen)
+  // sich sonst gegenseitig im Weg stünden.
+  function handleTileClick(entry: Entry, index: number, e: ReactMouseEvent): void {
+    if (e.shiftKey) {
+      const anchor = lastClickedIndex ?? index
+      const [start, end] = anchor <= index ? [anchor, index] : [index, anchor]
+      const rangeIds = filteredEntries.slice(start, end + 1).map((rangeEntry) => rangeEntry.id)
+      setSelectedIds((prev) => new Set([...prev, ...rangeIds]))
+      setSelectedEntryId(null)
+      return
+    }
+    if (e.ctrlKey || e.metaKey) {
+      setSelectedIds((prev) => {
+        const next = new Set(prev)
+        if (next.has(entry.id)) next.delete(entry.id)
+        else next.add(entry.id)
+        return next
+      })
+      setLastClickedIndex(index)
+      setSelectedEntryId(null)
+      return
+    }
+    setSelectedIds(new Set())
+    setSelectedEntryId(entry.id)
+    setLastClickedIndex(index)
+  }
+
+  async function handleBulkSetFavorite(favorite: boolean): Promise<void> {
+    setEntries(await window.api.bulkSetFavorite([...selectedIds], favorite))
+  }
+
+  async function handleBulkAddTag(tagId: string): Promise<void> {
+    try {
+      setEntries(await window.api.bulkAddTag([...selectedIds], tagId))
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : String(error))
+    }
+  }
+
+  async function handleBulkDelete(): Promise<void> {
+    if (!window.confirm(`${selectedIds.size} Programme aus dem Launcher entfernen?`)) return
+    setEntries(await window.api.bulkRemoveEntries([...selectedIds]))
+    setSelectedIds(new Set())
+  }
+
   async function handleMoveEntry(id: string, targetId: string, position: 'before' | 'after'): Promise<void> {
     setDraggedEntryId(null)
     setDragOverEntryId(null)
@@ -358,6 +415,12 @@ function App(): ReactElement {
       if (scannerOpen || statsOpen || overviewOpen || coverArtKeyDialogOpen || shortcutsOpen) return
       const activeTag = document.activeElement?.tagName
       if (activeTag === 'INPUT' || activeTag === 'TEXTAREA' || activeTag === 'SELECT') return
+
+      if (e.key === 'Escape' && selectedIds.size > 0) {
+        e.preventDefault()
+        setSelectedIds(new Set())
+        return
+      }
       if (filteredEntries.length === 0) return
 
       const currentIndex = filteredEntries.findIndex((entry) => entry.id === selectedEntryId)
@@ -403,7 +466,8 @@ function App(): ReactElement {
     statsOpen,
     overviewOpen,
     coverArtKeyDialogOpen,
-    shortcutsOpen
+    shortcutsOpen,
+    selectedIds
   ])
 
   function resetFilters(): void {
@@ -618,7 +682,7 @@ function App(): ReactElement {
             </div>
           ) : viewMode === 'grid' ? (
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
-              {filteredEntries.map((entry) => (
+              {filteredEntries.map((entry, index) => (
                 <div
                   key={entry.id}
                   draggable
@@ -638,7 +702,7 @@ function App(): ReactElement {
                     e.stopPropagation()
                     handleMoveEntry(draggedEntryId, entry.id, 'before')
                   }}
-                  onClick={() => setSelectedEntryId(entry.id)}
+                  onClick={(e) => handleTileClick(entry, index, e)}
                   onDoubleClick={() => handleLaunch(entry)}
                   onContextMenu={() => {
                     setSelectedEntryId(entry.id)
@@ -647,9 +711,11 @@ function App(): ReactElement {
                   className={`group relative flex cursor-pointer flex-col items-center gap-2 rounded-xl border p-4 text-center transition ${
                     dragOverEntryId === entry.id && draggedEntryId && draggedEntryId !== entry.id
                       ? 'border-gold bg-panel-active'
-                      : selectedEntryId === entry.id
-                        ? 'glow-gold border-gold/60 bg-panel-active'
-                        : 'border-border bg-panel hover:border-gold/30 hover:bg-panel-hover'
+                      : selectedIds.has(entry.id)
+                        ? 'border-sky-400/70 bg-panel-active ring-2 ring-sky-400/40'
+                        : selectedEntryId === entry.id
+                          ? 'glow-gold border-gold/60 bg-panel-active'
+                          : 'border-border bg-panel hover:border-gold/30 hover:bg-panel-hover'
                   } ${draggedEntryId === entry.id ? 'opacity-40' : ''}`}
                 >
                   <button
@@ -717,7 +783,7 @@ function App(): ReactElement {
             </div>
           ) : (
             <div className="flex flex-col gap-1">
-              {filteredEntries.map((entry) => (
+              {filteredEntries.map((entry, index) => (
                 <div
                   key={entry.id}
                   draggable
@@ -737,7 +803,7 @@ function App(): ReactElement {
                     e.stopPropagation()
                     handleMoveEntry(draggedEntryId, entry.id, 'before')
                   }}
-                  onClick={() => setSelectedEntryId(entry.id)}
+                  onClick={(e) => handleTileClick(entry, index, e)}
                   onDoubleClick={() => handleLaunch(entry)}
                   onContextMenu={() => {
                     setSelectedEntryId(entry.id)
@@ -746,9 +812,11 @@ function App(): ReactElement {
                   className={`group flex cursor-pointer items-center gap-3 rounded-lg border px-3 py-2 transition ${
                     dragOverEntryId === entry.id && draggedEntryId && draggedEntryId !== entry.id
                       ? 'border-gold bg-panel-active'
-                      : selectedEntryId === entry.id
-                        ? 'glow-gold border-gold/60 bg-panel-active'
-                        : 'border-transparent hover:bg-panel-hover'
+                      : selectedIds.has(entry.id)
+                        ? 'border-sky-400/70 bg-panel-active ring-2 ring-sky-400/40'
+                        : selectedEntryId === entry.id
+                          ? 'glow-gold border-gold/60 bg-panel-active'
+                          : 'border-transparent hover:bg-panel-hover'
                   } ${draggedEntryId === entry.id ? 'opacity-40' : ''}`}
                 >
                   <EntryIcon
@@ -840,11 +908,60 @@ function App(): ReactElement {
         )}
       </div>
 
-      {status && (
+      {selectedIds.size > 0 ? (
         <>
           <div className="divider" />
-          <footer className="px-8 py-3 text-sm text-text-muted">{status}</footer>
+          <div className="flex items-center gap-3 px-8 py-3 text-sm">
+            <span className="font-medium text-text">{selectedIds.size} ausgewählt</span>
+            <button
+              onClick={() => handleBulkSetFavorite(true)}
+              className="rounded-lg border border-border bg-panel px-3 py-1.5 text-text transition hover:border-gold/50 hover:text-gold"
+            >
+              Favorisieren
+            </button>
+            <button
+              onClick={() => handleBulkSetFavorite(false)}
+              className="rounded-lg border border-border bg-panel px-3 py-1.5 text-text transition hover:border-gold/50 hover:text-gold"
+            >
+              Favorit entfernen
+            </button>
+            {tags.length > 0 && (
+              <select
+                value=""
+                onChange={(e) => {
+                  if (e.target.value) handleBulkAddTag(e.target.value)
+                }}
+                className="rounded-lg border border-border bg-panel px-3 py-1.5 text-text outline-none focus:border-gold/50"
+              >
+                <option value="">Tag hinzufügen …</option>
+                {tags.map((tag) => (
+                  <option key={tag.id} value={tag.id}>
+                    {tag.name}
+                  </option>
+                ))}
+              </select>
+            )}
+            <button
+              onClick={handleBulkDelete}
+              className="rounded-lg border border-border bg-panel px-3 py-1.5 text-text transition hover:border-red-400/50 hover:text-red-400"
+            >
+              Entfernen
+            </button>
+            <button
+              onClick={() => setSelectedIds(new Set())}
+              className="ml-auto text-text-muted hover:text-gold"
+            >
+              Auswahl aufheben
+            </button>
+          </div>
         </>
+      ) : (
+        status && (
+          <>
+            <div className="divider" />
+            <footer className="px-8 py-3 text-sm text-text-muted">{status}</footer>
+          </>
+        )
       )}
 
       {scannerOpen && (

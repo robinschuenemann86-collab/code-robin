@@ -184,6 +184,47 @@ export function toggleFavorite(id: string): Entry[] {
   return updated
 }
 
+export function setFavoriteForMany(ids: string[], favorite: boolean): Entry[] {
+  const idSet = new Set(ids)
+  const entries = getStore().get('entries')
+  const updated = entries.map((entry) => (idSet.has(entry.id) ? { ...entry, favorite } : entry))
+  setEntries(updated)
+  return updated
+}
+
+export function addTagToMany(ids: string[], tagId: string): Entry[] {
+  if (
+    !getStore()
+      .get('tags')
+      .some((t) => t.id === tagId)
+  ) {
+    throw new Error('Tag wurde nicht gefunden.')
+  }
+  const idSet = new Set(ids)
+  const entries = getStore().get('entries')
+  const updated = entries.map((entry) =>
+    idSet.has(entry.id) && !entry.tags.includes(tagId)
+      ? { ...entry, tags: [...entry.tags, tagId] }
+      : entry
+  )
+  setEntries(updated)
+  return updated
+}
+
+// Ruft removeEntry() nacheinander statt parallel auf — die Cache-GC-Prüfung
+// darin ("wird der Hash noch von einem anderen Eintrag verwendet?") liest den
+// jeweils aktuellen Datenbestand, was bei gleichzeitigen Aufrufen zu falschen
+// Ergebnissen führen könnte.
+export async function removeMany(ids: string[]): Promise<Entry[]> {
+  let result = getStore().get('entries')
+  for (const id of ids) {
+    if (result.some((entry) => entry.id === id)) {
+      result = await removeEntry(id)
+    }
+  }
+  return result
+}
+
 export async function removeEntry(id: string): Promise<Entry[]> {
   const entries = getStore().get('entries')
   const target = entries.find((entry) => entry.id === id)
@@ -404,6 +445,16 @@ export function registerEntryHandlers(getWindow: () => BrowserWindow | null): vo
   ipcMain.handle('entries:toggleFavorite', (_event, id: string) => toggleFavorite(id))
 
   ipcMain.handle('entries:remove', (_event, id: string) => removeEntry(id))
+
+  ipcMain.handle('entries:bulkSetFavorite', (_event, ids: string[], favorite: boolean) =>
+    setFavoriteForMany(ids, favorite)
+  )
+
+  ipcMain.handle('entries:bulkAddTag', (_event, ids: string[], tagId: string) =>
+    addTagToMany(ids, tagId)
+  )
+
+  ipcMain.handle('entries:bulkRemove', (_event, ids: string[]) => removeMany(ids))
 
   ipcMain.handle(
     'entries:move',

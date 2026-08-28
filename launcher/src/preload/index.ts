@@ -22,6 +22,12 @@ const api = {
   getEntrySize: (id: string): Promise<number | null> => ipcRenderer.invoke('entries:getSize', id),
   toggleFavorite: (id: string): Promise<Entry[]> =>
     ipcRenderer.invoke('entries:toggleFavorite', id),
+  bulkSetFavorite: (ids: string[], favorite: boolean): Promise<Entry[]> =>
+    ipcRenderer.invoke('entries:bulkSetFavorite', ids, favorite),
+  bulkAddTag: (ids: string[], tagId: string): Promise<Entry[]> =>
+    ipcRenderer.invoke('entries:bulkAddTag', ids, tagId),
+  bulkRemoveEntries: (ids: string[]): Promise<Entry[]> =>
+    ipcRenderer.invoke('entries:bulkRemove', ids),
   addEntriesFromPaths: (paths: string[]): Promise<Entry[]> =>
     ipcRenderer.invoke('entries:addPaths', paths),
   showEntryInExplorer: (id: string): void => ipcRenderer.send('entries:showInExplorer', id),
