@@ -26,6 +26,7 @@ import { StatsDialog } from './components/StatsDialog'
 import { OverviewDialog } from './components/OverviewDialog'
 import { CoverArtKeyDialog } from './components/CoverArtKeyDialog'
 import { ShortcutsDialog } from './components/ShortcutsDialog'
+import { ConfirmDialog } from './components/ConfirmDialog'
 import { BigPictureView } from './components/BigPictureView'
 import {
   IconAlertTriangle,
@@ -60,6 +61,11 @@ function App(): ReactElement {
   const [overview, setOverview] = useState<OverviewData | null>(null)
   const [coverArtKeyDialogOpen, setCoverArtKeyDialogOpen] = useState(false)
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
+  const [pendingConfirm, setPendingConfirm] = useState<{
+    title: string
+    message: string
+    onConfirm: () => void
+  } | null>(null)
   const [updaterStatus, setUpdaterStatus] = useState<UpdaterStatus | null>(null)
   const [bigPictureMode, setBigPictureMode] = useState(false)
 
@@ -281,11 +287,17 @@ function App(): ReactElement {
     setEntries(await window.api.toggleFavorite(entry.id))
   }
 
-  async function handleDelete(entry: Entry): Promise<void> {
-    if (!window.confirm(`"${entry.name}" aus dem Launcher entfernen?`)) return
-    const updated = await window.api.removeEntry(entry.id)
-    setEntries(updated)
-    if (selectedEntryId === entry.id) setSelectedEntryId(null)
+  function handleDelete(entry: Entry): void {
+    setPendingConfirm({
+      title: 'Programm entfernen',
+      message: `"${entry.name}" aus dem Launcher entfernen?`,
+      onConfirm: async () => {
+        setPendingConfirm(null)
+        const updated = await window.api.removeEntry(entry.id)
+        setEntries(updated)
+        if (selectedEntryId === entry.id) setSelectedEntryId(null)
+      }
+    })
   }
 
   async function handleRename(id: string, name: string): Promise<void> {
@@ -350,10 +362,16 @@ function App(): ReactElement {
     }
   }
 
-  async function handleBulkDelete(): Promise<void> {
-    if (!window.confirm(`${selectedIds.size} Programme aus dem Launcher entfernen?`)) return
-    setEntries(await window.api.bulkRemoveEntries([...selectedIds]))
-    setSelectedIds(new Set())
+  function handleBulkDelete(): void {
+    setPendingConfirm({
+      title: 'Programme entfernen',
+      message: `${selectedIds.size} Programme aus dem Launcher entfernen?`,
+      onConfirm: async () => {
+        setPendingConfirm(null)
+        setEntries(await window.api.bulkRemoveEntries([...selectedIds]))
+        setSelectedIds(new Set())
+      }
+    })
   }
 
   async function handleMoveEntry(id: string, targetId: string, position: 'before' | 'after'): Promise<void> {
@@ -402,9 +420,7 @@ function App(): ReactElement {
     }
   }
 
-  async function handleRemoveTag(id: string): Promise<void> {
-    const tag = tags.find((t) => t.id === id)
-    if (tag && !window.confirm(`Tag "${tag.name}" löschen?`)) return
+  async function removeTagNow(id: string): Promise<void> {
     setTags(await window.api.removeTag(id))
     setEntries(await window.api.listEntries())
     setSelectedTagIds((prev) => {
@@ -412,6 +428,22 @@ function App(): ReactElement {
       const next = new Set(prev)
       next.delete(id)
       return next
+    })
+  }
+
+  function handleRemoveTag(id: string): void {
+    const tag = tags.find((t) => t.id === id)
+    if (!tag) {
+      void removeTagNow(id)
+      return
+    }
+    setPendingConfirm({
+      title: 'Tag löschen',
+      message: `Tag "${tag.name}" löschen?`,
+      onConfirm: () => {
+        setPendingConfirm(null)
+        void removeTagNow(id)
+      }
     })
   }
 
@@ -474,7 +506,15 @@ function App(): ReactElement {
       // Sonst würden Pfeiltasten/Enter/Entf durch einen offenen Dialog
       // hindurch auf die dahinterliegende Bibliothek wirken — z. B. Enter
       // startet ein Spiel, während gerade der Übersicht-Dialog offen ist.
-      if (scannerOpen || statsOpen || overviewOpen || coverArtKeyDialogOpen || shortcutsOpen) return
+      if (
+        scannerOpen ||
+        statsOpen ||
+        overviewOpen ||
+        coverArtKeyDialogOpen ||
+        shortcutsOpen ||
+        pendingConfirm
+      )
+        return
       const activeTag = document.activeElement?.tagName
       if (activeTag === 'INPUT' || activeTag === 'TEXTAREA' || activeTag === 'SELECT') return
 
@@ -529,6 +569,7 @@ function App(): ReactElement {
     overviewOpen,
     coverArtKeyDialogOpen,
     shortcutsOpen,
+    pendingConfirm,
     selectedIds
   ])
 
@@ -1061,6 +1102,15 @@ function App(): ReactElement {
       )}
 
       {shortcutsOpen && <ShortcutsDialog onClose={() => setShortcutsOpen(false)} />}
+
+      {pendingConfirm && (
+        <ConfirmDialog
+          title={pendingConfirm.title}
+          message={pendingConfirm.message}
+          onConfirm={pendingConfirm.onConfirm}
+          onCancel={() => setPendingConfirm(null)}
+        />
+      )}
     </div>
   )
 }
