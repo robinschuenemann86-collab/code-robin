@@ -36,6 +36,21 @@ Willkommen bei MR Launch! Hier die wichtigsten Funktionen auf einen Blick.
 - **Übersicht**-Knopf: Wochenaktivität, Streak, Wochenziel und optionale
   Pausen-Erinnerung nach X Minuten am Stück.
 
+## Kleine Extras
+
+- **Würfel-Button**: wählt (mit kurzer Slot-Machine-Animation) zufällig ein
+  Programm aus der aktuellen Ansicht.
+- **Erfolge**: Meilensteine wie "10 Programme" oder "100 Stunden Spielzeit",
+  einsehbar im "Übersicht"-Dialog.
+- **Jahresrückblick**: Knopf "Jahresrückblick anzeigen" im "Übersicht"-Dialog
+  zeigt meistgespieltes Programm, verrücktesten Tag und mehr.
+- **Screenshot-Galerie**: bei Steam-Titeln zeigt das Detail-Panel die letzten
+  Screenshots an.
+- **Schwebendes Overlay**: zeigt Programmname und Spielzeit, solange etwas
+  läuft, auch wenn das Hauptfenster im Hintergrund ist.
+- **Soundeffekte** und der **Lautsprecher-Knopf** in der Seitenleiste zum
+  Abschalten.
+
 ## Big-Picture-Modus
 
 Der Knopf mit den vier Ecken oben rechts schaltet in eine vollbildschirm-,
@@ -51,6 +66,13 @@ Favorisieren. Die vollständige Liste zeigt der "?"-Knopf oben rechts.
 Über das "…"-Menü lässt sich der komplette Datenbestand (Programme, Tags,
 Spielzeit) inklusive Icons und Cover-Art als Datei sichern und auf einem
 anderen PC wiederherstellen.
+
+## PC-Abgleich (optional)
+
+Über "PC-Abgleich…" im "…"-Menü lassen sich Favoriten, Sterne und Tags
+zwischen eigenen PCs abgleichen (fügt nie neue Programme hinzu). Dafür auf
+allen beteiligten PCs denselben Code eintragen — diesen Code nicht
+weitergeben, wer ihn kennt, hat Zugriff auf diese Daten.
 
 ## Installer oder portable Version?
 

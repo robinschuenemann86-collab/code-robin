@@ -30,6 +30,7 @@ import { CoverArtKeyDialog } from './components/CoverArtKeyDialog'
 import { HelpDialog } from './components/HelpDialog'
 import { ConfirmDialog } from './components/ConfirmDialog'
 import { EntryContextMenu } from './components/EntryContextMenu'
+import { SyncDialog } from './components/SyncDialog'
 import { DiceRollOverlay } from './components/DiceRollOverlay'
 import { isSoundEnabled, playLaunchSound, playSuccessSound, setSoundEnabled } from './sounds'
 import {
@@ -82,6 +83,7 @@ function App(): ReactElement {
   const [overviewOpen, setOverviewOpen] = useState(false)
   const [overview, setOverview] = useState<OverviewData | null>(null)
   const [coverArtKeyDialogOpen, setCoverArtKeyDialogOpen] = useState(false)
+  const [syncDialogOpen, setSyncDialogOpen] = useState(false)
   const [helpOpen, setHelpOpen] = useState(false)
   const [pendingConfirm, setPendingConfirm] = useState<{
     title: string
@@ -168,6 +170,10 @@ function App(): ReactElement {
 
   useEffect(() => {
     return window.api.onOpenCoverArtKeyDialog(() => setCoverArtKeyDialogOpen(true))
+  }, [])
+
+  useEffect(() => {
+    return window.api.onOpenSyncDialog(() => setSyncDialogOpen(true))
   }, [])
 
   // Rückmeldungen aus dem nativen Rechtsklick-Menü (z. B. Cover-Art-Suche) —
@@ -613,6 +619,7 @@ function App(): ReactElement {
         statsOpen ||
         overviewOpen ||
         coverArtKeyDialogOpen ||
+        syncDialogOpen ||
         helpOpen ||
         pendingConfirm
       )
@@ -675,6 +682,7 @@ function App(): ReactElement {
     statsOpen,
     overviewOpen,
     coverArtKeyDialogOpen,
+    syncDialogOpen,
     helpOpen,
     pendingConfirm,
     contextMenu,
@@ -1264,6 +1272,16 @@ function App(): ReactElement {
 
       {coverArtKeyDialogOpen && (
         <CoverArtKeyDialog onClose={() => setCoverArtKeyDialogOpen(false)} />
+      )}
+
+      {syncDialogOpen && (
+        <SyncDialog
+          onClose={() => setSyncDialogOpen(false)}
+          onSynced={() => {
+            window.api.listEntries().then(setEntries)
+            window.api.listTags().then(setTags)
+          }}
+        />
       )}
 
       {helpOpen && <HelpDialog onClose={() => setHelpOpen(false)} />}

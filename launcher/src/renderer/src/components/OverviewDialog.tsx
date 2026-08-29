@@ -1,9 +1,10 @@
 import { useMemo, useState, type ReactElement } from 'react'
-import type { Entry, EntryStats, OverviewData } from '../types'
+import type { Entry, EntryStats, OverviewData, WrappedData } from '../types'
 import { EntryIcon } from './EntryIcon'
 import { IconEdit, IconX } from './icons'
 import { useEscapeToClose } from '../hooks'
 import { ACHIEVEMENTS, unlockedAchievements, type AchievementContext } from '../achievements'
+import { WrappedDialog } from './WrappedDialog'
 
 interface OverviewDialogProps {
   entries: Entry[]
@@ -50,6 +51,7 @@ export function OverviewDialog({
   const [goalHours, setGoalHours] = useState(
     overview.weeklyGoalMinutes ? String(overview.weeklyGoalMinutes / 60) : ''
   )
+  const [wrapped, setWrapped] = useState<WrappedData | null>(null)
   const [editingReminder, setEditingReminder] = useState(false)
   const [reminderMinutes, setReminderMinutes] = useState(
     overview.breakReminderMinutes ? String(overview.breakReminderMinutes) : ''
@@ -101,9 +103,17 @@ export function OverviewDialog({
           <h2 className="font-display text-2xl font-extrabold uppercase tracking-tight">
             Deine Woche
           </h2>
-          <button onClick={onClose} className="text-text-muted hover:text-gold" title="Schließen">
-            <IconX className="h-4 w-4" />
-          </button>
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => window.api.getWrapped().then(setWrapped)}
+              className="text-sm font-semibold text-gold hover:brightness-125"
+            >
+              Jahresrückblick anzeigen
+            </button>
+            <button onClick={onClose} className="text-text-muted hover:text-gold" title="Schließen">
+              <IconX className="h-4 w-4" />
+            </button>
+          </div>
         </div>
 
         <div className="flex gap-4">
@@ -359,6 +369,8 @@ export function OverviewDialog({
           </div>
         </div>
       </div>
+
+      {wrapped && <WrappedDialog wrapped={wrapped} entries={entries} onClose={() => setWrapped(null)} />}
     </div>
   )
 }

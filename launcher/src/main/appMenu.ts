@@ -31,6 +31,11 @@ export function registerAppMenuHandlers(getWindow: () => BrowserWindow | null): 
       {
         label: 'Fehlende Cover-Art nachladen',
         click: () => void fetchMissingCoverArtForAll(window)
+      },
+      { type: 'separator' },
+      {
+        label: 'PC-Abgleich…',
+        click: () => window.webContents.send('sync:openDialog')
       }
     ])
     menu.popup({ window })

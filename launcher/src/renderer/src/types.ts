@@ -81,3 +81,18 @@ export interface SmartSuggestion {
   entryId: string
   playCountOnThisWeekday: number
 }
+
+export interface SyncResult {
+  ok: boolean
+  message: string
+}
+
+export interface WrappedData {
+  year: number
+  totalPlayedMs: number
+  topGame: { entryId: string; totalPlayedMs: number } | null
+  wildestDay: { date: string; totalPlayedMs: number } | null
+  longestSession: { entryId: string; durationMs: number } | null
+  gamesAdded: number
+  totalLaunches: number
+}

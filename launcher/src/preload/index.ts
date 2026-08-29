@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer } from 'electron'
 import type { Entry, SavedView, Session, Tag } from '../main/store'
 import type { Candidate, ScanResult } from '../main/scanner'
 import type { EntryStats, OverviewData, SmartSuggestion, WrappedData } from '../main/stats'
+import type { SyncResult } from '../main/sync'
 import type { UpdaterStatus } from '../main/updater'
 
 // Jede Funktion hier entspricht genau einem erlaubten IPC-Kanal.
@@ -102,6 +103,15 @@ const api = {
 
   getScreenshots: (id: string): Promise<string[]> =>
     ipcRenderer.invoke('screenshots:getForEntry', id),
+
+  getSyncCode: (): Promise<string | null> => ipcRenderer.invoke('sync:getCode'),
+  setSyncCode: (code: string | null): Promise<void> => ipcRenderer.invoke('sync:setCode', code),
+  syncNow: (): Promise<SyncResult> => ipcRenderer.invoke('sync:now'),
+  onOpenSyncDialog: (callback: () => void): (() => void) => {
+    const listener = (): void => callback()
+    ipcRenderer.on('sync:openDialog', listener)
+    return () => ipcRenderer.removeListener('sync:openDialog', listener)
+  },
 
   hasSeenWelcome: (): Promise<boolean> => ipcRenderer.invoke('onboarding:hasSeenWelcome'),
   markWelcomeSeen: (): Promise<void> => ipcRenderer.invoke('onboarding:markWelcomeSeen'),

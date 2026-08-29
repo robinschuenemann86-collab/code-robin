@@ -19,6 +19,7 @@ import { registerCoverArtHandlers } from './coverArt'
 import { registerSavedViewHandlers } from './savedViews'
 import { registerOnboardingHandlers } from './onboarding'
 import { registerScreenshotHandlers } from './screenshots'
+import { registerSyncHandlers } from './sync'
 
 registerIconProtocolScheme()
 
@@ -133,6 +134,7 @@ app.whenReady().then(() => {
   registerSavedViewHandlers()
   registerOnboardingHandlers()
   registerScreenshotHandlers()
+  registerSyncHandlers()
 
   createWindow()
 

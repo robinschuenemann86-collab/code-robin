@@ -1,6 +1,7 @@
 import type { Entry, SavedView, Session, Tag } from '../main/store'
 import type { Candidate, ScanResult } from '../main/scanner'
 import type { EntryStats, OverviewData, SmartSuggestion, WrappedData } from '../main/stats'
+import type { SyncResult } from '../main/sync'
 import type { UpdaterStatus } from '../main/updater'
 
 export interface LauncherApi {
@@ -42,6 +43,7 @@ export interface LauncherApi {
   getEntrySessions: (id: string) => Promise<Session[]>
   getRunningEntries: () => Promise<string[]>
   getSmartSuggestion: () => Promise<SmartSuggestion | null>
+  getWrapped: () => Promise<WrappedData>
   setWeeklyGoal: (minutes: number | null) => Promise<void>
   setBreakReminder: (minutes: number | null) => Promise<void>
 
@@ -61,6 +63,11 @@ export interface LauncherApi {
   onOpenCoverArtKeyDialog: (callback: () => void) => () => void
 
   getScreenshots: (id: string) => Promise<string[]>
+
+  getSyncCode: () => Promise<string | null>
+  setSyncCode: (code: string | null) => Promise<void>
+  syncNow: () => Promise<SyncResult>
+  onOpenSyncDialog: (callback: () => void) => () => void
 
   hasSeenWelcome: () => Promise<boolean>
   markWelcomeSeen: () => Promise<void>
