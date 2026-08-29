@@ -13,9 +13,58 @@ const ALLOWED_PATHS = [
   /^\/heroes\/game\/\d+$/
 ]
 
+// Bibliotheks-Abgleich zwischen mehreren PCs: ein frei gewählter Code
+// identifiziert einen Datensatz in einem Cloudflare-KV-Namespace (Bindung
+// "SYNC_STORE") — bewusst kein echtes Login, nur ein geteiltes Geheimnis
+// zwischen den eigenen PCs. Wer den Code kennt, kann lesen und schreiben;
+// für den persönlichen Gebrauch zwischen eigenen Geräten ausreichend, aber
+// kein Ersatz für echte Zugriffskontrolle.
+const SYNC_CODE_PATTERN = /^[A-Za-z0-9]{16,64}$/
+const MAX_SYNC_BODY_BYTES = 200_000
+
+async function handleSync(request, env, code) {
+  if (!env.SYNC_STORE) {
+    return new Response('Abgleich ist nicht eingerichtet (KV-Namespace SYNC_STORE fehlt).', {
+      status: 500
+    })
+  }
+  if (!SYNC_CODE_PATTERN.test(code)) {
+    return new Response('Ungültiger Code.', { status: 400 })
+  }
+
+  if (request.method === 'GET') {
+    const stored = await env.SYNC_STORE.get(`sync:${code}`)
+    return new Response(stored ?? 'null', {
+      status: 200,
+      headers: { 'content-type': 'application/json' }
+    })
+  }
+
+  if (request.method === 'POST') {
+    const body = await request.text()
+    if (body.length > MAX_SYNC_BODY_BYTES) {
+      return new Response('Daten zu groß.', { status: 413 })
+    }
+    try {
+      JSON.parse(body)
+    } catch {
+      return new Response('Ungültiges JSON.', { status: 400 })
+    }
+    await env.SYNC_STORE.put(`sync:${code}`, body)
+    return new Response('OK', { status: 200 })
+  }
+
+  return new Response('Method not allowed', { status: 405 })
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url)
+
+    const syncMatch = url.pathname.match(/^\/sync\/([^/]+)$/)
+    if (syncMatch) {
+      return handleSync(request, env, syncMatch[1])
+    }
 
     if (!ALLOWED_PATHS.some((pattern) => pattern.test(url.pathname))) {
       return new Response('Not found', { status: 404 })
