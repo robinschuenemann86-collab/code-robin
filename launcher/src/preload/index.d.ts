@@ -1,6 +1,6 @@
 import type { Entry, SavedView, Session, Tag } from '../main/store'
 import type { Candidate, ScanResult } from '../main/scanner'
-import type { EntryStats, OverviewData } from '../main/stats'
+import type { EntryStats, OverviewData, SmartSuggestion } from '../main/stats'
 import type { UpdaterStatus } from '../main/updater'
 
 export interface LauncherApi {
@@ -41,6 +41,7 @@ export interface LauncherApi {
   getOverview: () => Promise<OverviewData>
   getEntrySessions: (id: string) => Promise<Session[]>
   getRunningEntries: () => Promise<string[]>
+  getSmartSuggestion: () => Promise<SmartSuggestion | null>
   setWeeklyGoal: (minutes: number | null) => Promise<void>
   setBreakReminder: (minutes: number | null) => Promise<void>
 

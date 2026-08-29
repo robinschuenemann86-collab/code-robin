@@ -89,6 +89,27 @@ export async function setCustomIcon(entryId: string, imagePath: string): Promise
   }
 }
 
+// Cacht einen Screenshot (siehe screenshots.ts) unter dem Hash seines Pfades —
+// derselbe Screenshot wird also nicht mehrfach kopiert, wenn er erneut
+// angefragt wird.
+export async function ensureScreenshotCached(imagePath: string): Promise<string | null> {
+  const hash = hashPath(imagePath)
+  const file = iconFilePath(hash)
+
+  if (existsSync(file)) {
+    return hash
+  }
+
+  try {
+    const image = nativeImage.createFromPath(imagePath)
+    if (image.isEmpty()) return null
+    await fs.writeFile(file, image.toPNG())
+    return hash
+  } catch {
+    return null
+  }
+}
+
 export async function removeCachedIcon(hash: string): Promise<void> {
   const file = iconFilePath(hash)
   try {

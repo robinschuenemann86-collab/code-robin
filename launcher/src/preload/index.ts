@@ -1,7 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type { Entry, SavedView, Session, Tag } from '../main/store'
 import type { Candidate, ScanResult } from '../main/scanner'
-import type { EntryStats, OverviewData } from '../main/stats'
+import type { EntryStats, OverviewData, SmartSuggestion } from '../main/stats'
 import type { UpdaterStatus } from '../main/updater'
 
 // Jede Funktion hier entspricht genau einem erlaubten IPC-Kanal.
@@ -64,6 +64,8 @@ const api = {
   getEntrySessions: (id: string): Promise<Session[]> =>
     ipcRenderer.invoke('stats:sessionsForEntry', id),
   getRunningEntries: (): Promise<string[]> => ipcRenderer.invoke('stats:runningEntries'),
+  getSmartSuggestion: (): Promise<SmartSuggestion | null> =>
+    ipcRenderer.invoke('stats:smartSuggestion'),
   setWeeklyGoal: (minutes: number | null): Promise<void> =>
     ipcRenderer.invoke('stats:setWeeklyGoal', minutes),
   setBreakReminder: (minutes: number | null): Promise<void> =>

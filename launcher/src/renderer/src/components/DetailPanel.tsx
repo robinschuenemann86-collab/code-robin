@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactElement } from 'react'
 import type { Entry, EntryStats, Tag } from '../types'
 import type { Session } from '../../../main/store'
 import { EntryIcon } from './EntryIcon'
+import { extractAccentColor } from '../colorExtraction'
 import {
   IconAlertTriangle,
   IconCalendar,
@@ -68,12 +69,30 @@ export function DetailPanel({
   const [launchArgs, setLaunchArgsValue] = useState(entry.launchArgs ?? '')
   const [size, setSize] = useState<number | null | 'loading'>('loading')
   const [sessions, setSessions] = useState<Session[]>([])
+  const [accentColor, setAccentColor] = useState<string | null>(null)
   const canUseLaunchArgs = !entry.steamAppId && !entry.epicAppName && !entry.battlenetCode
 
   useEffect(() => {
     setSize('loading')
     window.api.getEntrySize(entry.id).then(setSize)
   }, [entry.id])
+
+  // Akzentfarbe aus Cover oder Icon — sorgt für eine dezente, zum jeweiligen
+  // Programm passende Farbstimmung statt eines immer gleichen Panels.
+  useEffect(() => {
+    const hash = entry.coverHash ?? entry.iconHash
+    if (!hash) {
+      setAccentColor(null)
+      return
+    }
+    let cancelled = false
+    extractAccentColor(hash).then((color) => {
+      if (!cancelled) setAccentColor(color)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [entry.coverHash, entry.iconHash])
 
   useEffect(() => {
     window.api.getEntrySessions(entry.id).then(setSessions)
@@ -92,7 +111,13 @@ export function DetailPanel({
   }
 
   return (
-    <aside className="flex w-72 shrink-0 flex-col gap-4 border-l border-border bg-panel/40 p-5">
+    <aside className="relative flex w-72 shrink-0 flex-col gap-4 border-l border-border bg-panel/40 p-5">
+      {accentColor && (
+        <div
+          className="pointer-events-none absolute inset-x-0 top-0 h-56 opacity-25"
+          style={{ background: `linear-gradient(180deg, ${accentColor}, transparent)` }}
+        />
+      )}
       {entry.heroHash && (
         <img
           src={`launcher-icon://${entry.heroHash}`}
@@ -124,7 +149,8 @@ export function DetailPanel({
         <button
           onClick={() => onChangeIcon(entry.id)}
           title="Icon ändern"
-          className="group relative"
+          className="group relative rounded-xl"
+          style={accentColor ? { boxShadow: `0 0 24px 2px ${accentColor}55` } : undefined}
         >
           <EntryIcon
             iconHash={entry.iconHash}

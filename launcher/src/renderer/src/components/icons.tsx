@@ -231,6 +231,21 @@ export function IconDice(props: IconProps): ReactElement {
   )
 }
 
+export function IconSpeaker(props: IconProps & { muted?: boolean }): ReactElement {
+  const { muted, ...rest } = props
+  return base(
+    rest,
+    <>
+      <path d="M4 9.5h3.5L12 6v12l-4.5-3.5H4z" />
+      {muted ? (
+        <path d="m16 9 4 6M20 9l-4 6" />
+      ) : (
+        <path d="M16.5 8.5a5 5 0 0 1 0 7" />
+      )}
+    </>
+  )
+}
+
 export function IconHelp(props: IconProps): ReactElement {
   return base(
     props,

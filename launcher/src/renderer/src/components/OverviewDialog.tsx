@@ -3,6 +3,7 @@ import type { Entry, EntryStats, OverviewData } from '../types'
 import { EntryIcon } from './EntryIcon'
 import { IconEdit, IconX } from './icons'
 import { useEscapeToClose } from '../hooks'
+import { ACHIEVEMENTS, unlockedAchievements, type AchievementContext } from '../achievements'
 
 interface OverviewDialogProps {
   entries: Entry[]
@@ -74,6 +75,18 @@ export function OverviewDialog({
     if (!top || top.totalPlayedMs === 0) return null
     return entries.find((e) => e.id === top.entryId) ?? null
   }, [stats, entries])
+
+  const unlockedIds = useMemo(() => {
+    const context: AchievementContext = {
+      entryCount: entries.length,
+      totalPlayedMs: stats.reduce((sum, s) => sum + s.totalPlayedMs, 0),
+      totalLaunches: overview.totalLaunches,
+      streakDays: overview.streakDays,
+      favoriteCount: entries.filter((e) => e.favorite).length,
+      tagCount: new Set(entries.flatMap((e) => e.tags)).size
+    }
+    return new Set(unlockedAchievements(context).map((a) => a.id))
+  }, [entries, stats, overview])
 
   const recent = overview.recentSessions
     .map((session) => ({ session, entry: entries.find((e) => e.id === session.entryId) }))
@@ -317,6 +330,32 @@ export function OverviewDialog({
                 </div>
               ))
             )}
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-3 rounded-2xl border border-border bg-panel p-6">
+          <span className="font-display text-xs font-bold uppercase tracking-wider text-text-muted">
+            Erfolge &middot; {unlockedIds.size}/{ACHIEVEMENTS.length}
+          </span>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-5">
+            {ACHIEVEMENTS.map((achievement) => {
+              const unlocked = unlockedIds.has(achievement.id)
+              return (
+                <div
+                  key={achievement.id}
+                  title={achievement.description}
+                  className={`flex flex-col items-center gap-1 rounded-xl border p-3 text-center transition ${
+                    unlocked
+                      ? 'border-gold/40 bg-panel-active'
+                      : 'border-border opacity-40 grayscale'
+                  }`}
+                >
+                  <span className="text-xl">🏆</span>
+                  <span className="text-xs font-bold">{achievement.name}</span>
+                  <span className="text-[10px] text-text-muted">{achievement.description}</span>
+                </div>
+              )
+            })}
           </div>
         </div>
       </div>

@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactElement } from 'react'
 import type { Entry } from '../types'
 import { EntryIcon } from './EntryIcon'
+import { extractAccentColor } from '../colorExtraction'
 import logo from '../assets/logo.png'
 
 interface BigPictureViewProps {
@@ -97,13 +98,33 @@ export function BigPictureView({
   }, [entries, selectedIndex])
 
   const selectedEntry = entries[selectedIndex] as Entry | undefined
+  const [accentColor, setAccentColor] = useState<string | null>(null)
+
+  // Die Hintergrundfarbe folgt dem fokussierten Spiel — fällt ohne Cover/Icon
+  // auf den bisherigen festen Ember-Ton zurück.
+  useEffect(() => {
+    const hash = selectedEntry?.coverHash ?? selectedEntry?.iconHash
+    if (!hash) {
+      setAccentColor(null)
+      return
+    }
+    let cancelled = false
+    extractAccentColor(hash).then((color) => {
+      if (!cancelled) setAccentColor(color)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [selectedEntry?.coverHash, selectedEntry?.iconHash])
 
   return (
     <div
       className="fixed inset-0 z-50 flex flex-col overflow-hidden p-10 text-text"
       style={{
-        background:
-          'radial-gradient(120% 90% at 50% 0%, color-mix(in srgb, var(--color-ember) 20%, var(--color-base)) 0%, color-mix(in srgb, var(--color-ember) 6%, var(--color-base)) 45%, var(--color-base) 100%)'
+        background: accentColor
+          ? `radial-gradient(120% 90% at 50% 0%, color-mix(in srgb, ${accentColor} 22%, var(--color-base)) 0%, color-mix(in srgb, ${accentColor} 6%, var(--color-base)) 45%, var(--color-base) 100%)`
+          : 'radial-gradient(120% 90% at 50% 0%, color-mix(in srgb, var(--color-ember) 20%, var(--color-base)) 0%, color-mix(in srgb, var(--color-ember) 6%, var(--color-base)) 45%, var(--color-base) 100%)',
+        transition: 'background 0.6s ease'
       }}
     >
       {/* Hero-Banner des fokussierten Spiels als Hintergrund, wie auf einer
@@ -113,7 +134,7 @@ export function BigPictureView({
           key={selectedEntry.heroHash}
           src={`launcher-icon://${selectedEntry.heroHash}`}
           alt=""
-          className="absolute inset-0 h-full w-full object-cover opacity-30"
+          className="hero-ken-burns absolute inset-0 h-full w-full object-cover opacity-30"
         />
       )}
       <div

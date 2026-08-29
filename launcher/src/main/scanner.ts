@@ -138,7 +138,7 @@ async function scanRegistry(existingPaths: Set<string>): Promise<Candidate[]> {
 
 const STEAM_NOISE_APP_IDS = new Set(['228980']) // Steamworks Common Redistributables
 
-async function findSteamPath(): Promise<string | null> {
+export async function findSteamPath(): Promise<string | null> {
   for (const args of [
     ['query', 'HKCU\\SOFTWARE\\Valve\\Steam', '/v', 'SteamPath'],
     ['query', 'HKCU\\SOFTWARE\\Valve\\Steam', '/v', 'InstallPath']

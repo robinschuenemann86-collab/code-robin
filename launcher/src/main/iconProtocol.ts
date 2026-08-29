@@ -20,7 +20,13 @@ export function registerIconProtocolHandler(): void {
     }
     try {
       const data = await fs.readFile(iconFilePath(hash))
-      return new Response(data, { headers: { 'content-type': 'image/png' } })
+      // Ohne diesen Header würde der Renderer beim Auslesen der
+      // Bild-Pixeldaten (siehe colorExtraction.ts) einen Security-Fehler
+      // wegen "getainteter" Canvas bekommen — unbedenklich, da rein lokal
+      // gecachte Bilder ausgeliefert werden.
+      return new Response(data, {
+        headers: { 'content-type': 'image/png', 'access-control-allow-origin': '*' }
+      })
     } catch {
       return new Response(null, { status: 404 })
     }

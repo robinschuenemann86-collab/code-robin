@@ -17,7 +17,11 @@ win:
     - nsis
     - portable
 nsis:
-  artifactName: ${name}-${version}-setup.${ext}
+  # Bewusst ohne Versionsnummer im Dateinamen: dadurch funktioniert
+  # https://github.com/<owner>/<repo>/releases/latest/download/MR-Launch-Setup.exe
+  # als dauerhafter Link zur jeweils neuesten Version, ohne ihn je manuell
+  # aktualisieren zu müssen.
+  artifactName: MR-Launch-Setup.${ext}
   shortcutName: ${productName}
   uninstallDisplayName: ${productName}
   createDesktopShortcut: always

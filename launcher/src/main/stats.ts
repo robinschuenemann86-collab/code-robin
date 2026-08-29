@@ -178,6 +178,36 @@ function getRunningEntryIds(): string[] {
     .map((session) => session.entryId)
 }
 
+// Schaut, welches Programm am aktuellen Wochentag historisch am häufigsten
+// gestartet wurde — eine einfache, nachvollziehbare Musteranalyse statt einer
+// komplexen Empfehlungslogik. Erst ab 3 Treffern an diesem Wochentag als
+// "Muster" gewertet, um einzelne Zufallsstarts nicht als Vorschlag zu zeigen.
+export interface SmartSuggestion {
+  entryId: string
+  playCountOnThisWeekday: number
+}
+
+export function getSmartSuggestion(): SmartSuggestion | null {
+  const sessions = getStore()
+    .get('sessions')
+    .filter((s) => s.endedAt !== null)
+  const todayWeekday = new Date().getDay()
+
+  const countsByEntry = new Map<string, number>()
+  for (const session of sessions) {
+    if (new Date(session.startedAt).getDay() !== todayWeekday) continue
+    countsByEntry.set(session.entryId, (countsByEntry.get(session.entryId) ?? 0) + 1)
+  }
+
+  let best: SmartSuggestion | null = null
+  for (const [entryId, count] of countsByEntry) {
+    if (!best || count > best.playCountOnThisWeekday) {
+      best = { entryId, playCountOnThisWeekday: count }
+    }
+  }
+  return best && best.playCountOnThisWeekday >= 3 ? best : null
+}
+
 export function registerStatsHandlers(): void {
   ipcMain.handle('stats:list', () => computeStats())
   ipcMain.handle('stats:overview', () => computeOverview())
@@ -185,6 +215,7 @@ export function registerStatsHandlers(): void {
     getSessionsForEntry(entryId)
   )
   ipcMain.handle('stats:runningEntries', () => getRunningEntryIds())
+  ipcMain.handle('stats:smartSuggestion', () => getSmartSuggestion())
   ipcMain.handle('stats:setWeeklyGoal', (_event, minutes: number | null) =>
     setWeeklyGoalMinutes(minutes)
   )

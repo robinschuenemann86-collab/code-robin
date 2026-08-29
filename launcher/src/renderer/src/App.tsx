@@ -1,6 +1,7 @@
 import {
   useEffect,
   useMemo,
+  useRef,
   useState,
   type DragEvent,
   type MouseEvent as ReactMouseEvent,
@@ -11,6 +12,7 @@ import type {
   EntryStats,
   OverviewData,
   SavedView,
+  SmartSuggestion,
   SortMode,
   Tag,
   TagFilterMode,
@@ -28,6 +30,14 @@ import { CoverArtKeyDialog } from './components/CoverArtKeyDialog'
 import { HelpDialog } from './components/HelpDialog'
 import { ConfirmDialog } from './components/ConfirmDialog'
 import { EntryContextMenu } from './components/EntryContextMenu'
+import { DiceRollOverlay } from './components/DiceRollOverlay'
+import { isSoundEnabled, playLaunchSound, playSuccessSound, setSoundEnabled } from './sounds'
+import {
+  loadSeenAchievementIds,
+  saveSeenAchievementIds,
+  unlockedAchievements,
+  type AchievementContext
+} from './achievements'
 import { BigPictureView } from './components/BigPictureView'
 import {
   IconAlertTriangle,
@@ -46,6 +56,16 @@ import {
 import logo from './assets/logo.png'
 
 const NEW_THRESHOLD_MS = 48 * 60 * 60 * 1000
+
+const WEEKDAY_NAMES = [
+  'Sonntag',
+  'Montag',
+  'Dienstag',
+  'Mittwoch',
+  'Donnerstag',
+  'Freitag',
+  'Samstag'
+]
 
 function isNewEntry(entry: Entry): boolean {
   return Date.now() - entry.addedAt < NEW_THRESHOLD_MS
@@ -71,6 +91,7 @@ function App(): ReactElement {
   const [contextMenu, setContextMenu] = useState<{ entry: Entry; x: number; y: number } | null>(
     null
   )
+  const [diceRollPool, setDiceRollPool] = useState<Entry[] | null>(null)
   const [updaterStatus, setUpdaterStatus] = useState<UpdaterStatus | null>(null)
   const [bigPictureMode, setBigPictureMode] = useState(false)
 
@@ -79,6 +100,7 @@ function App(): ReactElement {
   const [tagFilterMode, setTagFilterMode] = useState<TagFilterMode>('and')
   const [unsortedOnly, setUnsortedOnly] = useState(false)
   const [favoritesOnly, setFavoritesOnly] = useState(false)
+  const [soundEnabled, setSoundEnabledState] = useState(isSoundEnabled)
   const [missingOnly, setMissingOnly] = useState(false)
   const [viewMode, setViewMode] = useState<ViewMode>('grid')
   const [sortMode, setSortMode] = useState<SortMode>('added')
@@ -90,11 +112,17 @@ function App(): ReactElement {
   const [runningIds, setRunningIds] = useState<Set<string>>(new Set())
   const [savedViews, setSavedViews] = useState<SavedView[]>([])
   const [coverArtNudgeDismissed, setCoverArtNudgeDismissed] = useState(false)
+  const [smartSuggestion, setSmartSuggestion] = useState<SmartSuggestion | null>(null)
+  const [suggestionDismissed, setSuggestionDismissed] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [lastClickedIndex, setLastClickedIndex] = useState<number | null>(null)
 
   useEffect(() => {
     window.api.listSavedViews().then(setSavedViews)
+  }, [])
+
+  useEffect(() => {
+    window.api.getSmartSuggestion().then(setSmartSuggestion)
   }, [])
 
   // Zeigt die Hilfe beim allerersten Programmstart automatisch — danach nie
@@ -186,6 +214,40 @@ function App(): ReactElement {
     }
   }, [overviewOpen])
 
+  // Meldet neu freigeschaltete Erfolge über die Statuszeile. Der allererste
+  // Durchlauf säht den "schon gesehen"-Stand nur still ein, statt jemandem mit
+  // vorhandener Bibliothek gleich eine ganze Salve an Meldungen zu zeigen.
+  const seenAchievementsRef = useRef<Set<string> | null>(null)
+  useEffect(() => {
+    if (seenAchievementsRef.current === null) {
+      seenAchievementsRef.current = loadSeenAchievementIds()
+    }
+    const context: AchievementContext = {
+      entryCount: entries.length,
+      totalPlayedMs: stats.reduce((sum, s) => sum + s.totalPlayedMs, 0),
+      totalLaunches: stats.reduce((sum, s) => sum + s.launchCount, 0),
+      streakDays: overview?.streakDays ?? 0,
+      favoriteCount: entries.filter((e) => e.favorite).length,
+      tagCount: tags.length
+    }
+    const unlocked = unlockedAchievements(context)
+    const seen = seenAchievementsRef.current
+    const freshlyUnlocked = unlocked.filter((a) => !seen.has(a.id))
+    if (freshlyUnlocked.length === 0) return
+
+    unlocked.forEach((a) => seen.add(a.id))
+    saveSeenAchievementIds(seen)
+
+    const [first, ...rest] = freshlyUnlocked
+    setStatus(
+      rest.length === 0
+        ? `🏆 Erfolg freigeschaltet: „${first.name}"`
+        : `🏆 ${freshlyUnlocked.length} neue Erfolge freigeschaltet!`
+    )
+    playSuccessSound()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [entries, stats, tags, overview])
+
   async function handleSetWeeklyGoal(minutes: number | null): Promise<void> {
     await window.api.setWeeklyGoal(minutes)
     setOverview(await window.api.getOverview())
@@ -252,6 +314,9 @@ function App(): ReactElement {
 
   const selectedEntry = entries.find((e) => e.id === selectedEntryId) ?? null
   const missingCoverCount = entries.filter((e) => !e.coverHash).length
+  const suggestedEntry = smartSuggestion
+    ? (entries.find((e) => e.id === smartSuggestion.entryId) ?? null)
+    : null
 
   // Nur im ungefilterten Grundzustand zeigen — sonst wirkt es wie eine zweite,
   // widersprüchliche Liste neben den gerade gefilterten Ergebnissen.
@@ -298,6 +363,7 @@ function App(): ReactElement {
     setStatus(`Starte "${entry.name}" …`)
     try {
       await window.api.launchEntry(entry.id)
+      playLaunchSound()
       setStatus(`"${entry.name}" wurde gestartet.`)
       // Sonst dauert es bis zu 10s (Poll-Intervall), bis das "Läuft
       // gerade"-Abzeichen nach dem Start erscheint.
@@ -427,7 +493,11 @@ function App(): ReactElement {
       setStatus('Keine Programme in der aktuellen Ansicht.')
       return
     }
-    const pick = filteredEntries[Math.floor(Math.random() * filteredEntries.length)]
+    setDiceRollPool(filteredEntries)
+  }
+
+  function handleDiceRollDone(pick: Entry): void {
+    setDiceRollPool(null)
     setSelectedEntryId(pick.id)
     setStatus(`Wie wär's mit "${pick.name}"?`)
   }
@@ -749,6 +819,30 @@ function App(): ReactElement {
         </div>
       )}
 
+      {!loading && suggestedEntry && !suggestionDismissed && (
+        <div className="flex items-center justify-between border-b border-gold/30 bg-panel-active px-8 py-2 text-sm text-text">
+          <span>
+            Am {WEEKDAY_NAMES[new Date().getDay()]} spielst du oft{' '}
+            <span className="font-semibold">{suggestedEntry.name}</span> — jetzt starten?
+          </span>
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => handleLaunch(suggestedEntry)}
+              className="text-sm font-semibold text-gold hover:brightness-125"
+            >
+              Starten
+            </button>
+            <button
+              onClick={() => setSuggestionDismissed(true)}
+              title="Ausblenden"
+              className="text-text-muted hover:text-gold"
+            >
+              <IconX className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="divider" />
 
       <div className="flex min-h-0 flex-1">
@@ -768,6 +862,11 @@ function App(): ReactElement {
           onViewModeChange={setViewMode}
           favoritesOnly={favoritesOnly}
           onFavoritesOnlyChange={setFavoritesOnly}
+          soundEnabled={soundEnabled}
+          onSoundEnabledChange={(value) => {
+            setSoundEnabled(value)
+            setSoundEnabledState(value)
+          }}
           missingCount={missingPaths.size}
           missingOnly={missingOnly}
           onMissingOnlyChange={setMissingOnly}
@@ -1177,6 +1276,8 @@ function App(): ReactElement {
           onCancel={() => setPendingConfirm(null)}
         />
       )}
+
+      {diceRollPool && <DiceRollOverlay entries={diceRollPool} onDone={handleDiceRollDone} />}
 
       {contextMenu && (
         <EntryContextMenu

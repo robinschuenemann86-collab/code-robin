@@ -76,3 +76,8 @@ export interface OverviewData {
   weeklyGoalMinutes: number | null
   breakReminderMinutes: number | null
 }
+
+export interface SmartSuggestion {
+  entryId: string
+  playCountOnThisWeekday: number
+}

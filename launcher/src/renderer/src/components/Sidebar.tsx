@@ -8,6 +8,7 @@ import {
   IconList,
   IconPlus,
   IconSearch,
+  IconSpeaker,
   IconStar,
   IconTrash,
   IconX
@@ -29,6 +30,8 @@ interface SidebarProps {
   onViewModeChange: (mode: ViewMode) => void
   favoritesOnly: boolean
   onFavoritesOnlyChange: (value: boolean) => void
+  soundEnabled: boolean
+  onSoundEnabledChange: (value: boolean) => void
   missingCount: number
   missingOnly: boolean
   onMissingOnlyChange: (value: boolean) => void
@@ -69,6 +72,8 @@ export function Sidebar({
   onViewModeChange,
   favoritesOnly,
   onFavoritesOnlyChange,
+  soundEnabled,
+  onSoundEnabledChange,
   missingCount,
   missingOnly,
   onMissingOnlyChange,
@@ -152,6 +157,15 @@ export function Sidebar({
           }`}
         >
           <IconStar className="h-4 w-4" filled={favoritesOnly} />
+        </button>
+        <button
+          onClick={() => onSoundEnabledChange(!soundEnabled)}
+          title={soundEnabled ? 'Soundeffekte deaktivieren' : 'Soundeffekte aktivieren'}
+          className={`flex-1 rounded-md py-1.5 flex items-center justify-center transition ${
+            soundEnabled ? 'bg-panel-active text-gold' : 'text-text-muted hover:text-text'
+          }`}
+        >
+          <IconSpeaker className="h-4 w-4" muted={!soundEnabled} />
         </button>
       </div>
 
