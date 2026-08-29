@@ -13,7 +13,6 @@ import { registerIconProtocolScheme, registerIconProtocolHandler } from './iconP
 import { registerUpdaterHandlers } from './updater'
 import { registerTray, unregisterHotkey } from './tray'
 import { registerFullscreenHandlers, forwardFullscreenEvents } from './fullscreen'
-import { registerContextMenuHandlers } from './contextMenu'
 import { registerAppMenuHandlers } from './appMenu'
 import { loadWindowBounds, saveWindowBounds } from './windowBounds'
 import { registerCoverArtHandlers } from './coverArt'
@@ -128,7 +127,6 @@ app.whenReady().then(() => {
   registerUpdaterHandlers(() => mainWindow)
   registerTray(() => mainWindow)
   registerFullscreenHandlers(() => mainWindow)
-  registerContextMenuHandlers(() => mainWindow)
   registerAppMenuHandlers(() => mainWindow)
   registerCoverArtHandlers(() => mainWindow)
   registerSavedViewHandlers()

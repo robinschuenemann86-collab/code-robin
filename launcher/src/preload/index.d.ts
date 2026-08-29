@@ -50,7 +50,6 @@ export interface LauncherApi {
   setFullscreen: (value: boolean) => Promise<void>
   onFullscreenChanged: (callback: (value: boolean) => void) => () => void
 
-  showEntryContextMenu: (id: string) => void
   showAppMenu: () => void
 
   getCoverArtKey: () => Promise<string | null>

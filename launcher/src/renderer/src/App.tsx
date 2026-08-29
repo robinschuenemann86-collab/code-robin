@@ -27,6 +27,7 @@ import { OverviewDialog } from './components/OverviewDialog'
 import { CoverArtKeyDialog } from './components/CoverArtKeyDialog'
 import { HelpDialog } from './components/HelpDialog'
 import { ConfirmDialog } from './components/ConfirmDialog'
+import { EntryContextMenu } from './components/EntryContextMenu'
 import { BigPictureView } from './components/BigPictureView'
 import {
   IconAlertTriangle,
@@ -67,6 +68,9 @@ function App(): ReactElement {
     message: string
     onConfirm: () => void
   } | null>(null)
+  const [contextMenu, setContextMenu] = useState<{ entry: Entry; x: number; y: number } | null>(
+    null
+  )
   const [updaterStatus, setUpdaterStatus] = useState<UpdaterStatus | null>(null)
   const [bigPictureMode, setBigPictureMode] = useState(false)
 
@@ -543,6 +547,11 @@ function App(): ReactElement {
         pendingConfirm
       )
         return
+
+      if (contextMenu) {
+        if (e.key === 'Escape') setContextMenu(null)
+        return
+      }
       const activeTag = document.activeElement?.tagName
       if (activeTag === 'INPUT' || activeTag === 'TEXTAREA' || activeTag === 'SELECT') return
 
@@ -598,6 +607,7 @@ function App(): ReactElement {
     coverArtKeyDialogOpen,
     helpOpen,
     pendingConfirm,
+    contextMenu,
     selectedIds
   ])
 
@@ -865,9 +875,10 @@ function App(): ReactElement {
                   }}
                   onClick={(e) => handleTileClick(entry, index, e)}
                   onDoubleClick={() => handleLaunch(entry)}
-                  onContextMenu={() => {
+                  onContextMenu={(e) => {
+                    e.preventDefault()
                     setSelectedEntryId(entry.id)
-                    window.api.showEntryContextMenu(entry.id)
+                    setContextMenu({ entry, x: e.clientX, y: e.clientY })
                   }}
                   className={`group relative flex cursor-pointer flex-col items-center gap-2 rounded-xl border p-4 text-center transition ${
                     dragOverEntryId === entry.id && draggedEntryId && draggedEntryId !== entry.id
@@ -966,9 +977,10 @@ function App(): ReactElement {
                   }}
                   onClick={(e) => handleTileClick(entry, index, e)}
                   onDoubleClick={() => handleLaunch(entry)}
-                  onContextMenu={() => {
+                  onContextMenu={(e) => {
+                    e.preventDefault()
                     setSelectedEntryId(entry.id)
-                    window.api.showEntryContextMenu(entry.id)
+                    setContextMenu({ entry, x: e.clientX, y: e.clientY })
                   }}
                   className={`group flex cursor-pointer items-center gap-3 rounded-lg border px-3 py-2 transition ${
                     dragOverEntryId === entry.id && draggedEntryId && draggedEntryId !== entry.id
@@ -1163,6 +1175,23 @@ function App(): ReactElement {
           message={pendingConfirm.message}
           onConfirm={pendingConfirm.onConfirm}
           onCancel={() => setPendingConfirm(null)}
+        />
+      )}
+
+      {contextMenu && (
+        <EntryContextMenu
+          entry={contextMenu.entry}
+          tags={tags}
+          x={contextMenu.x}
+          y={contextMenu.y}
+          onClose={() => setContextMenu(null)}
+          onLaunch={handleLaunch}
+          onToggleFavorite={handleToggleFavorite}
+          onToggleTag={handleToggleTag}
+          onShowInExplorer={(id) => window.api.showEntryInExplorer(id)}
+          onChangeIcon={handleChangeIcon}
+          onFetchCoverArt={handleFetchCoverArt}
+          onRemove={handleDelete}
         />
       )}
     </div>

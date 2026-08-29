@@ -84,7 +84,6 @@ const api = {
     return () => ipcRenderer.removeListener('window:fullscreenChanged', listener)
   },
 
-  showEntryContextMenu: (id: string): void => ipcRenderer.send('contextMenu:showForEntry', id),
   showAppMenu: (): void => ipcRenderer.send('appMenu:show'),
 
   getCoverArtKey: (): Promise<string | null> => ipcRenderer.invoke('coverArt:get'),
