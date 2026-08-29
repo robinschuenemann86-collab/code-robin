@@ -304,7 +304,7 @@ export async function fetchMissingCoverArtForAll(window: BrowserWindow): Promise
   )
 }
 
-export function registerCoverArtHandlers(): void {
+export function registerCoverArtHandlers(getWindow: () => BrowserWindow | null): void {
   ipcMain.handle('coverArt:get', () => getApiKey())
 
   ipcMain.handle('coverArt:set', (_event, key: string) => {
@@ -313,4 +313,9 @@ export function registerCoverArtHandlers(): void {
 
   ipcMain.handle('coverArt:fetch', (_event, entryId: string) => fetchCoverArt(entryId))
   ipcMain.handle('coverArt:hasProxy', () => hasProxyConfigured())
+  ipcMain.handle('coverArt:fetchAllMissing', async () => {
+    const window = getWindow()
+    if (!window) return
+    await fetchMissingCoverArtForAll(window)
+  })
 }

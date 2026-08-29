@@ -18,6 +18,7 @@ import { registerAppMenuHandlers } from './appMenu'
 import { loadWindowBounds, saveWindowBounds } from './windowBounds'
 import { registerCoverArtHandlers } from './coverArt'
 import { registerSavedViewHandlers } from './savedViews'
+import { registerOnboardingHandlers } from './onboarding'
 
 registerIconProtocolScheme()
 
@@ -129,8 +130,9 @@ app.whenReady().then(() => {
   registerFullscreenHandlers(() => mainWindow)
   registerContextMenuHandlers(() => mainWindow)
   registerAppMenuHandlers(() => mainWindow)
-  registerCoverArtHandlers()
+  registerCoverArtHandlers(() => mainWindow)
   registerSavedViewHandlers()
+  registerOnboardingHandlers()
 
   createWindow()
 

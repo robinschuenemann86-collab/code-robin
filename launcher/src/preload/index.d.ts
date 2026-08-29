@@ -57,7 +57,11 @@ export interface LauncherApi {
   setCoverArtKey: (key: string) => Promise<void>
   hasCoverArtProxy: () => Promise<boolean>
   fetchCoverArt: (id: string) => Promise<Entry[]>
+  fetchAllMissingCoverArt: () => Promise<void>
   onOpenCoverArtKeyDialog: (callback: () => void) => () => void
+
+  hasSeenWelcome: () => Promise<boolean>
+  markWelcomeSeen: () => Promise<void>
 
   onStatusMessage: (callback: (message: string) => void) => () => void
 }

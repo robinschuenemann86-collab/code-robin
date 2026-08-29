@@ -91,11 +91,15 @@ const api = {
   setCoverArtKey: (key: string): Promise<void> => ipcRenderer.invoke('coverArt:set', key),
   hasCoverArtProxy: (): Promise<boolean> => ipcRenderer.invoke('coverArt:hasProxy'),
   fetchCoverArt: (id: string): Promise<Entry[]> => ipcRenderer.invoke('coverArt:fetch', id),
+  fetchAllMissingCoverArt: (): Promise<void> => ipcRenderer.invoke('coverArt:fetchAllMissing'),
   onOpenCoverArtKeyDialog: (callback: () => void): (() => void) => {
     const listener = (): void => callback()
     ipcRenderer.on('coverArt:openKeyDialog', listener)
     return () => ipcRenderer.removeListener('coverArt:openKeyDialog', listener)
   },
+
+  hasSeenWelcome: (): Promise<boolean> => ipcRenderer.invoke('onboarding:hasSeenWelcome'),
+  markWelcomeSeen: (): Promise<void> => ipcRenderer.invoke('onboarding:markWelcomeSeen'),
 
   onStatusMessage: (callback: (message: string) => void): (() => void) => {
     const listener = (_event: unknown, message: string): void => callback(message)

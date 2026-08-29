@@ -25,7 +25,7 @@ import { ScannerDialog } from './components/ScannerDialog'
 import { StatsDialog } from './components/StatsDialog'
 import { OverviewDialog } from './components/OverviewDialog'
 import { CoverArtKeyDialog } from './components/CoverArtKeyDialog'
-import { ShortcutsDialog } from './components/ShortcutsDialog'
+import { HelpDialog } from './components/HelpDialog'
 import { ConfirmDialog } from './components/ConfirmDialog'
 import { BigPictureView } from './components/BigPictureView'
 import {
@@ -39,7 +39,8 @@ import {
   IconPlus,
   IconSearch,
   IconStar,
-  IconTrash
+  IconTrash,
+  IconX
 } from './components/icons'
 import logo from './assets/logo.png'
 
@@ -60,7 +61,7 @@ function App(): ReactElement {
   const [overviewOpen, setOverviewOpen] = useState(false)
   const [overview, setOverview] = useState<OverviewData | null>(null)
   const [coverArtKeyDialogOpen, setCoverArtKeyDialogOpen] = useState(false)
-  const [shortcutsOpen, setShortcutsOpen] = useState(false)
+  const [helpOpen, setHelpOpen] = useState(false)
   const [pendingConfirm, setPendingConfirm] = useState<{
     title: string
     message: string
@@ -84,11 +85,22 @@ function App(): ReactElement {
   const [dragOverEntryId, setDragOverEntryId] = useState<string | null>(null)
   const [runningIds, setRunningIds] = useState<Set<string>>(new Set())
   const [savedViews, setSavedViews] = useState<SavedView[]>([])
+  const [coverArtNudgeDismissed, setCoverArtNudgeDismissed] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [lastClickedIndex, setLastClickedIndex] = useState<number | null>(null)
 
   useEffect(() => {
     window.api.listSavedViews().then(setSavedViews)
+  }, [])
+
+  // Zeigt die Hilfe beim allerersten Programmstart automatisch — danach nie
+  // wieder von selbst, erreichbar bleibt sie über den "?"-Knopf.
+  useEffect(() => {
+    window.api.hasSeenWelcome().then((seen) => {
+      if (seen) return
+      setHelpOpen(true)
+      window.api.markWelcomeSeen()
+    })
   }, [])
 
   // Das Prozess-Polling im Main-Prozess läuft alle 15s (siehe playtime.ts) —
@@ -235,6 +247,7 @@ function App(): ReactElement {
   ])
 
   const selectedEntry = entries.find((e) => e.id === selectedEntryId) ?? null
+  const missingCoverCount = entries.filter((e) => !e.coverHash).length
 
   // Nur im ungefilterten Grundzustand zeigen — sonst wirkt es wie eine zweite,
   // widersprüchliche Liste neben den gerade gefilterten Ergebnissen.
@@ -329,6 +342,10 @@ function App(): ReactElement {
     } catch (error) {
       setStatus(error instanceof Error ? error.message : String(error))
     }
+  }
+
+  async function handleFetchAllMissingCoverArt(): Promise<void> {
+    await window.api.fetchAllMissingCoverArt()
   }
 
   // Normaler Klick wählt wie bisher genau ein Programm für das Detail-Panel.
@@ -522,7 +539,7 @@ function App(): ReactElement {
         statsOpen ||
         overviewOpen ||
         coverArtKeyDialogOpen ||
-        shortcutsOpen ||
+        helpOpen ||
         pendingConfirm
       )
         return
@@ -579,7 +596,7 @@ function App(): ReactElement {
     statsOpen,
     overviewOpen,
     coverArtKeyDialogOpen,
-    shortcutsOpen,
+    helpOpen,
     pendingConfirm,
     selectedIds
   ])
@@ -668,8 +685,8 @@ function App(): ReactElement {
             <IconMore />
           </button>
           <button
-            onClick={() => setShortcutsOpen(true)}
-            title="Tastenkürzel"
+            onClick={() => setHelpOpen(true)}
+            title="Hilfe"
             className="rounded-lg border border-border bg-panel p-2.5 text-text transition hover:border-gold/50 hover:text-gold"
           >
             <IconHelp />
@@ -695,6 +712,30 @@ function App(): ReactElement {
           >
             Jetzt neu starten
           </button>
+        </div>
+      )}
+
+      {!loading && missingCoverCount > 0 && !coverArtNudgeDismissed && (
+        <div className="flex items-center justify-between border-b border-gold/30 bg-panel-active px-8 py-2 text-sm text-text">
+          <span>
+            {missingCoverCount} {missingCoverCount === 1 ? 'Programm hat' : 'Programme haben'} noch
+            kein Cover-Bild.
+          </span>
+          <div className="flex items-center gap-4">
+            <button
+              onClick={handleFetchAllMissingCoverArt}
+              className="text-sm font-semibold text-gold hover:brightness-125"
+            >
+              Jetzt laden
+            </button>
+            <button
+              onClick={() => setCoverArtNudgeDismissed(true)}
+              title="Ausblenden"
+              className="text-text-muted hover:text-gold"
+            >
+              <IconX className="h-3.5 w-3.5" />
+            </button>
+          </div>
         </div>
       )}
 
@@ -1114,7 +1155,7 @@ function App(): ReactElement {
         <CoverArtKeyDialog onClose={() => setCoverArtKeyDialogOpen(false)} />
       )}
 
-      {shortcutsOpen && <ShortcutsDialog onClose={() => setShortcutsOpen(false)} />}
+      {helpOpen && <HelpDialog onClose={() => setHelpOpen(false)} />}
 
       {pendingConfirm && (
         <ConfirmDialog
