@@ -1,7 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type { Entry, SavedView, Session, Tag } from '../main/store'
 import type { Candidate, ScanResult } from '../main/scanner'
-import type { EntryStats, OverviewData, SmartSuggestion } from '../main/stats'
+import type { EntryStats, OverviewData, SmartSuggestion, WrappedData } from '../main/stats'
 import type { UpdaterStatus } from '../main/updater'
 
 // Jede Funktion hier entspricht genau einem erlaubten IPC-Kanal.
@@ -66,6 +66,7 @@ const api = {
   getRunningEntries: (): Promise<string[]> => ipcRenderer.invoke('stats:runningEntries'),
   getSmartSuggestion: (): Promise<SmartSuggestion | null> =>
     ipcRenderer.invoke('stats:smartSuggestion'),
+  getWrapped: (): Promise<WrappedData> => ipcRenderer.invoke('stats:wrapped'),
   setWeeklyGoal: (minutes: number | null): Promise<void> =>
     ipcRenderer.invoke('stats:setWeeklyGoal', minutes),
   setBreakReminder: (minutes: number | null): Promise<void> =>
@@ -98,6 +99,9 @@ const api = {
     ipcRenderer.on('coverArt:openKeyDialog', listener)
     return () => ipcRenderer.removeListener('coverArt:openKeyDialog', listener)
   },
+
+  getScreenshots: (id: string): Promise<string[]> =>
+    ipcRenderer.invoke('screenshots:getForEntry', id),
 
   hasSeenWelcome: (): Promise<boolean> => ipcRenderer.invoke('onboarding:hasSeenWelcome'),
   markWelcomeSeen: (): Promise<void> => ipcRenderer.invoke('onboarding:markWelcomeSeen'),

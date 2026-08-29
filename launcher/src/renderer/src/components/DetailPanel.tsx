@@ -70,6 +70,8 @@ export function DetailPanel({
   const [size, setSize] = useState<number | null | 'loading'>('loading')
   const [sessions, setSessions] = useState<Session[]>([])
   const [accentColor, setAccentColor] = useState<string | null>(null)
+  const [screenshots, setScreenshots] = useState<string[]>([])
+  const [lightboxHash, setLightboxHash] = useState<string | null>(null)
   const canUseLaunchArgs = !entry.steamAppId && !entry.epicAppName && !entry.battlenetCode
 
   useEffect(() => {
@@ -97,6 +99,16 @@ export function DetailPanel({
   useEffect(() => {
     window.api.getEntrySessions(entry.id).then(setSessions)
   }, [entry.id, stats])
+
+  // Nur für Steam-Titel möglich — andere Quellen haben keinen einheitlichen
+  // Screenshot-Speicherort (siehe screenshots.ts).
+  useEffect(() => {
+    if (!entry.steamAppId) {
+      setScreenshots([])
+      return
+    }
+    window.api.getScreenshots(entry.id).then(setScreenshots)
+  }, [entry.id, entry.steamAppId])
 
   function commitName(): void {
     const trimmed = name.trim()
@@ -300,6 +312,38 @@ export function DetailPanel({
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {screenshots.length > 0 && (
+        <div className="flex flex-col gap-1.5">
+          <span className="font-display text-[11px] font-bold tracking-wider text-text-muted">
+            SCREENSHOTS
+          </span>
+          <div className="flex gap-1.5 overflow-x-auto pb-1">
+            {screenshots.map((hash) => (
+              <button key={hash} onClick={() => setLightboxHash(hash)} className="shrink-0">
+                <img
+                  src={`launcher-icon://${hash}`}
+                  alt=""
+                  className="h-14 w-24 rounded-md object-cover transition hover:brightness-110"
+                />
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {lightboxHash && (
+        <div
+          className="fixed inset-0 z-20 flex items-center justify-center bg-black/85 p-8"
+          onClick={() => setLightboxHash(null)}
+        >
+          <img
+            src={`launcher-icon://${lightboxHash}`}
+            alt=""
+            className="max-h-full max-w-full rounded-lg object-contain shadow-2xl"
+          />
         </div>
       )}
 

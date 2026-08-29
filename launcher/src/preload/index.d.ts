@@ -1,6 +1,6 @@
 import type { Entry, SavedView, Session, Tag } from '../main/store'
 import type { Candidate, ScanResult } from '../main/scanner'
-import type { EntryStats, OverviewData, SmartSuggestion } from '../main/stats'
+import type { EntryStats, OverviewData, SmartSuggestion, WrappedData } from '../main/stats'
 import type { UpdaterStatus } from '../main/updater'
 
 export interface LauncherApi {
@@ -59,6 +59,8 @@ export interface LauncherApi {
   fetchCoverArt: (id: string) => Promise<Entry[]>
   fetchAllMissingCoverArt: () => Promise<void>
   onOpenCoverArtKeyDialog: (callback: () => void) => () => void
+
+  getScreenshots: (id: string) => Promise<string[]>
 
   hasSeenWelcome: () => Promise<boolean>
   markWelcomeSeen: () => Promise<void>

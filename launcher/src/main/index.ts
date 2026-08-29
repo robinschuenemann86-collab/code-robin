@@ -18,6 +18,7 @@ import { loadWindowBounds, saveWindowBounds } from './windowBounds'
 import { registerCoverArtHandlers } from './coverArt'
 import { registerSavedViewHandlers } from './savedViews'
 import { registerOnboardingHandlers } from './onboarding'
+import { registerScreenshotHandlers } from './screenshots'
 
 registerIconProtocolScheme()
 
@@ -131,6 +132,7 @@ app.whenReady().then(() => {
   registerCoverArtHandlers(() => mainWindow)
   registerSavedViewHandlers()
   registerOnboardingHandlers()
+  registerScreenshotHandlers()
 
   createWindow()
 

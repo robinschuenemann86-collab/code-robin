@@ -8,6 +8,7 @@ import { getStore, setEntries, setSessions, nextOrder, type Entry } from './stor
 import { ensureIconCached, removeCachedIcon, setCustomIcon } from './icons'
 import { startSession } from './playtime'
 import { setDiscordPresence } from './discordPresence'
+import { showOverlay } from './overlayWindow'
 import { fetchCoverArtForNewEntries } from './coverArt'
 
 function deriveName(targetPath: string): string {
@@ -304,7 +305,10 @@ export async function launchEntry(id: string): Promise<void> {
   // Nur wenn wirklich eine Sitzung getrackt wird (siehe startSession-Guard) —
   // sonst würde "Spielt gerade X" nie wieder verschwinden, weil auch das
   // Ende nur über das Prozess-Polling erkannt wird.
-  if (entry.expectedProcessName) setDiscordPresence(entry.name)
+  if (entry.expectedProcessName) {
+    setDiscordPresence(entry.name)
+    showOverlay(entry.name, Date.now())
+  }
 }
 
 // Einfacher Tokenizer statt eines echten Shell-Parsers — reicht für den

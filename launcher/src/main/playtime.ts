@@ -3,6 +3,7 @@ import { randomUUID } from 'crypto'
 import { Notification } from 'electron'
 import { getStore, setSessionArchive, setSessions, setSettings, type Session } from './store'
 import { clearDiscordPresence } from './discordPresence'
+import { hideOverlay } from './overlayWindow'
 
 const POLL_INTERVAL_MS = 15_000
 const MISSES_BEFORE_END = 2 // ~30s Abwesenheit, bevor eine Sitzung als beendet gilt
@@ -176,7 +177,10 @@ async function pollTick(): Promise<void> {
     // Sobald keine Sitzung mehr offen ist, läuft (soweit MR Launch weiß)
     // gerade kein getracktes Spiel mehr — "Spielt gerade X" soll dann wieder
     // verschwinden statt das zuletzt beendete Spiel weiter anzuzeigen.
-    if (!updated.some((s) => s.endedAt === null)) clearDiscordPresence()
+    if (!updated.some((s) => s.endedAt === null)) {
+      clearDiscordPresence()
+      hideOverlay()
+    }
   }
 }
 

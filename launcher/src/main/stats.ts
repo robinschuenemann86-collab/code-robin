@@ -208,6 +208,68 @@ export function getSmartSuggestion(): SmartSuggestion | null {
   return best && best.playCountOnThisWeekday >= 3 ? best : null
 }
 
+export interface WrappedData {
+  year: number
+  totalPlayedMs: number
+  topGame: { entryId: string; totalPlayedMs: number } | null
+  wildestDay: { date: string; totalPlayedMs: number } | null
+  longestSession: { entryId: string; durationMs: number } | null
+  gamesAdded: number
+  totalLaunches: number
+}
+
+// Ausgewertet wird bewusst nur, was aktuell in `sessions` steht — sehr alte,
+// bereits archivierte Sitzungen (siehe playtime.ts archiveOldSessions)
+// fließen dann nicht mehr mit ein. Für den Normalfall (ein Kalenderjahr)
+// unkritisch, nur bei sehr intensiver Nutzung eines einzelnen Programms
+// könnten vereinzelte ältere Tage fehlen.
+export function getWrapped(): WrappedData {
+  const year = new Date().getFullYear()
+  const yearStart = new Date(year, 0, 1).getTime()
+  const sessions = getStore()
+    .get('sessions')
+    .filter((s) => s.endedAt !== null && s.startedAt >= yearStart)
+  const entries = getStore().get('entries')
+
+  let totalPlayedMs = 0
+  const byEntry = new Map<string, number>()
+  const byDay = new Map<string, number>()
+  let longestSession: WrappedData['longestSession'] = null
+
+  for (const session of sessions) {
+    const duration = (session.endedAt as number) - session.startedAt
+    totalPlayedMs += duration
+    byEntry.set(session.entryId, (byEntry.get(session.entryId) ?? 0) + duration)
+
+    const dayKey = new Date(session.startedAt).toISOString().slice(0, 10)
+    byDay.set(dayKey, (byDay.get(dayKey) ?? 0) + duration)
+
+    if (!longestSession || duration > longestSession.durationMs) {
+      longestSession = { entryId: session.entryId, durationMs: duration }
+    }
+  }
+
+  let topGame: WrappedData['topGame'] = null
+  for (const [entryId, ms] of byEntry) {
+    if (!topGame || ms > topGame.totalPlayedMs) topGame = { entryId, totalPlayedMs: ms }
+  }
+
+  let wildestDay: WrappedData['wildestDay'] = null
+  for (const [date, ms] of byDay) {
+    if (!wildestDay || ms > wildestDay.totalPlayedMs) wildestDay = { date, totalPlayedMs: ms }
+  }
+
+  return {
+    year,
+    totalPlayedMs,
+    topGame,
+    wildestDay,
+    longestSession,
+    gamesAdded: entries.filter((e) => e.addedAt >= yearStart).length,
+    totalLaunches: sessions.length
+  }
+}
+
 export function registerStatsHandlers(): void {
   ipcMain.handle('stats:list', () => computeStats())
   ipcMain.handle('stats:overview', () => computeOverview())
@@ -216,6 +278,7 @@ export function registerStatsHandlers(): void {
   )
   ipcMain.handle('stats:runningEntries', () => getRunningEntryIds())
   ipcMain.handle('stats:smartSuggestion', () => getSmartSuggestion())
+  ipcMain.handle('stats:wrapped', () => getWrapped())
   ipcMain.handle('stats:setWeeklyGoal', (_event, minutes: number | null) =>
     setWeeklyGoalMinutes(minutes)
   )
