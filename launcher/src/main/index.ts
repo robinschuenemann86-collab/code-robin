@@ -16,6 +16,8 @@ import { registerFullscreenHandlers, forwardFullscreenEvents } from './fullscree
 import { registerAppMenuHandlers } from './appMenu'
 import { loadWindowBounds, saveWindowBounds } from './windowBounds'
 import { registerCoverArtHandlers } from './coverArt'
+import { registerMetadataHandlers } from './metadata'
+import { registerSteamAchievementsHandlers } from './steamAchievements'
 import { registerSavedViewHandlers } from './savedViews'
 import { registerOnboardingHandlers } from './onboarding'
 import { registerScreenshotHandlers } from './screenshots'
@@ -131,6 +133,8 @@ app.whenReady().then(() => {
   registerFullscreenHandlers(() => mainWindow)
   registerAppMenuHandlers(() => mainWindow)
   registerCoverArtHandlers(() => mainWindow)
+  registerMetadataHandlers(() => mainWindow)
+  registerSteamAchievementsHandlers()
   registerSavedViewHandlers()
   registerOnboardingHandlers()
   registerScreenshotHandlers()

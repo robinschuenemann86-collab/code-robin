@@ -11,12 +11,13 @@ import { fetchCoverArtForNewEntries } from './coverArt'
 export interface Candidate {
   key: string
   name: string
-  source: 'registry' | 'steam' | 'epic' | 'battlenet' | 'ubisoft' | 'ea' | 'gog'
+  source: 'registry' | 'steam' | 'epic' | 'battlenet' | 'ubisoft' | 'ea' | 'gog' | 'xbox'
   path: string
   steamAppId: string | null
   epicAppName: string | null
   battlenetCode: string | null
   ubisoftId: string | null
+  xboxAumid: string | null
   expectedProcessName: string | null
   iconHash: string | null
   alreadyImported: boolean
@@ -126,6 +127,7 @@ async function scanRegistry(existingPaths: Set<string>): Promise<Candidate[]> {
       epicAppName: null,
       battlenetCode: null,
       ubisoftId: null,
+      xboxAumid: null,
       expectedProcessName: basename(exePath),
       iconHash,
       alreadyImported: existingPaths.has(exePath),
@@ -275,6 +277,7 @@ async function scanSteam(
           epicAppName: null,
           battlenetCode: null,
           ubisoftId: null,
+          xboxAumid: null,
           expectedProcessName: findMainExecutable(installPath),
           iconHash,
           alreadyImported: existingSteamAppIds.has(appId),
@@ -353,6 +356,7 @@ async function scanEpic(
         epicAppName: appName,
         battlenetCode: null,
         ubisoftId: null,
+        xboxAumid: null,
         expectedProcessName: basename(launchExecutable),
         iconHash,
         alreadyImported: existingEpicAppNames.has(appName),
@@ -424,6 +428,7 @@ async function scanBattleNet(
       epicAppName: null,
       battlenetCode: code,
       ubisoftId: null,
+      xboxAumid: null,
       expectedProcessName: exeName,
       iconHash,
       alreadyImported: existingCodes.has(code),
@@ -490,6 +495,7 @@ async function scanUbisoft(
       epicAppName: null,
       battlenetCode: null,
       ubisoftId: id,
+      xboxAumid: null,
       expectedProcessName: exeName,
       iconHash,
       alreadyImported: existingUbisoftIds.has(id),
@@ -588,6 +594,7 @@ async function scanEa(
       epicAppName: null,
       battlenetCode: null,
       ubisoftId: null,
+      xboxAumid: null,
       expectedProcessName: basename(resolvedExePath),
       iconHash,
       alreadyImported: existingPaths.has(resolvedExePath),
@@ -677,9 +684,130 @@ async function scanGog(
       epicAppName: null,
       battlenetCode: null,
       ubisoftId: null,
+      xboxAumid: null,
       expectedProcessName: basename(exePath),
       iconHash,
       alreadyImported: existingPaths.has(exePath),
+      likelyRelevant: true
+    })
+  }
+
+  return { candidates, skipped }
+}
+
+function runPowerShell(command: string): Promise<string> {
+  return new Promise((resolve) => {
+    let stdout = ''
+    try {
+      const child = spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', command], {
+        windowsHide: true
+      })
+      child.stdout.on('data', (chunk) => (stdout += chunk.toString()))
+      child.on('error', () => resolve(''))
+      child.on('close', () => resolve(stdout))
+    } catch {
+      resolve('')
+    }
+  })
+}
+
+interface AppxPackage {
+  PackageFamilyName: string
+  InstallLocation: string
+  Name: string
+}
+
+async function listAppxPackages(): Promise<AppxPackage[]> {
+  const output = await runPowerShell(
+    'Get-AppxPackage | Select-Object PackageFamilyName, InstallLocation, Name | ConvertTo-Json -Compress'
+  )
+  if (!output.trim()) return []
+  try {
+    const parsed = JSON.parse(output)
+    const list = Array.isArray(parsed) ? parsed : [parsed]
+    return list.filter(
+      (entry): entry is AppxPackage =>
+        !!entry && typeof entry.PackageFamilyName === 'string' && typeof entry.InstallLocation === 'string'
+    )
+  } catch {
+    return []
+  }
+}
+
+interface XboxManifestInfo {
+  isGame: boolean
+  appId: string | null
+  executable: string | null
+  displayName: string | null
+}
+
+// UWP-Pakete für Xbox/Game-Pass-Titel und ganz normale System-Apps (Taschenrechner,
+// Fotos, ...) sehen strukturell gleich aus. Das <uap5:GamingOptions>- bzw.
+// <uap:GamingOptions>-Element im Manifest ist das einzige verlässliche Zeichen,
+// dass es sich wirklich um ein Spiel handelt.
+function readXboxManifest(installLocation: string): XboxManifestInfo {
+  const manifestPath = join(installLocation, 'AppXManifest.xml')
+  if (!existsSync(manifestPath)) {
+    return { isGame: false, appId: null, executable: null, displayName: null }
+  }
+  let xml: string
+  try {
+    xml = readFileSync(manifestPath, 'utf-8')
+  } catch {
+    return { isGame: false, appId: null, executable: null, displayName: null }
+  }
+
+  const isGame = /<uap5?:GamingOptions\b/i.test(xml)
+
+  const appTagMatch = xml.match(/<Application\b[^>]*\/?>/i)
+  const appTag = appTagMatch ? appTagMatch[0] : ''
+  const appIdMatch = appTag.match(/\bId="([^"]+)"/i)
+  const executableMatch = appTag.match(/\bExecutable="([^"]+)"/i)
+
+  const displayNameMatch = xml.match(/<DisplayName>([^<]*)<\/DisplayName>/i)
+  const rawDisplayName = displayNameMatch ? displayNameMatch[1].trim() : null
+  const displayName = rawDisplayName && !rawDisplayName.startsWith('ms-resource:') ? rawDisplayName : null
+
+  return {
+    isGame,
+    appId: appIdMatch ? appIdMatch[1] : null,
+    executable: executableMatch ? executableMatch[1] : null,
+    displayName
+  }
+}
+
+async function scanXbox(
+  existingXboxAumids: Set<string>
+): Promise<{ candidates: Candidate[]; skipped: string[] }> {
+  const packages = await listAppxPackages()
+  const candidates: Candidate[] = []
+  const skipped: string[] = []
+
+  for (const pkg of packages) {
+    if (!pkg.InstallLocation || !existsSync(pkg.InstallLocation)) continue
+
+    const manifest = readXboxManifest(pkg.InstallLocation)
+    if (!manifest.isGame) continue
+
+    if (!manifest.appId) {
+      skipped.push(`Xbox/Store: App-ID für "${pkg.Name}" wurde nicht gefunden.`)
+      continue
+    }
+
+    const aumid = `${pkg.PackageFamilyName}!${manifest.appId}`
+    candidates.push({
+      key: `xbox:${aumid.toLowerCase()}`,
+      name: manifest.displayName ?? pkg.Name,
+      source: 'xbox',
+      path: pkg.InstallLocation,
+      steamAppId: null,
+      epicAppName: null,
+      battlenetCode: null,
+      ubisoftId: null,
+      xboxAumid: aumid,
+      expectedProcessName: manifest.executable ? basename(manifest.executable) : null,
+      iconHash: null,
+      alreadyImported: existingXboxAumids.has(aumid),
       likelyRelevant: true
     })
   }
@@ -711,15 +839,19 @@ async function scan(): Promise<ScanResult> {
   const existingUbisoftIds = new Set(
     entries.map((e) => e.ubisoftId).filter((id): id is string => !!id)
   )
+  const existingXboxAumids = new Set(
+    entries.map((e) => e.xboxAumid).filter((id): id is string => !!id)
+  )
 
-  const [registryCandidates, steam, epic, battlenet, ubisoft, ea, gog] = await Promise.all([
+  const [registryCandidates, steam, epic, battlenet, ubisoft, ea, gog, xbox] = await Promise.all([
     scanRegistry(existingPaths),
     scanSteam(existingSteamAppIds),
     scanEpic(existingEpicAppNames),
     scanBattleNet(existingBattlenetCodes),
     scanUbisoft(existingUbisoftIds),
     scanEa(existingPaths),
-    scanGog(existingPaths)
+    scanGog(existingPaths),
+    scanXbox(existingXboxAumids)
   ])
 
   return {
@@ -730,6 +862,7 @@ async function scan(): Promise<ScanResult> {
       ...ubisoft.candidates,
       ...ea.candidates,
       ...gog.candidates,
+      ...xbox.candidates,
       ...registryCandidates
     ],
     skipped: [
@@ -738,7 +871,8 @@ async function scan(): Promise<ScanResult> {
       ...battlenet.skipped,
       ...ubisoft.skipped,
       ...ea.skipped,
-      ...gog.skipped
+      ...gog.skipped,
+      ...xbox.skipped
     ]
   }
 }
@@ -760,6 +894,9 @@ async function importCandidates(candidates: Candidate[]): Promise<Entry[]> {
   const existingUbisoftIds = new Set(
     entries.map((e) => e.ubisoftId).filter((id): id is string => !!id)
   )
+  const existingXboxAumids = new Set(
+    entries.map((e) => e.xboxAumid).filter((id): id is string => !!id)
+  )
 
   const newEntries: Entry[] = []
   let order = nextOrder(entries) - 1000
@@ -777,6 +914,9 @@ async function importCandidates(candidates: Candidate[]): Promise<Entry[]> {
     } else if (candidate.source === 'ubisoft') {
       if (!candidate.ubisoftId) continue
       if (existingUbisoftIds.has(candidate.ubisoftId)) continue
+    } else if (candidate.source === 'xbox') {
+      if (!candidate.xboxAumid) continue
+      if (existingXboxAumids.has(candidate.xboxAumid)) continue
     } else {
       if (!existsSync(candidate.path)) continue
       if (existingPaths.has(candidate.path)) continue
@@ -795,11 +935,19 @@ async function importCandidates(candidates: Candidate[]): Promise<Entry[]> {
       epicAppName: candidate.epicAppName,
       battlenetCode: candidate.battlenetCode,
       ubisoftId: candidate.ubisoftId,
+      xboxAumid: candidate.xboxAumid,
       favorite: false,
       rating: 0,
       expectedProcessName: candidate.expectedProcessName,
       order: (order += 1000),
-      launchArgs: null
+      launchArgs: null,
+      preLaunchCommand: null,
+      postLaunchCommand: null,
+      emulatorPath: null,
+      description: null,
+      genre: null,
+      developer: null,
+      releaseYear: null
     })
   }
 

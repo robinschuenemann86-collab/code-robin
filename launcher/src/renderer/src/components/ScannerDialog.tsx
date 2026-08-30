@@ -43,6 +43,7 @@ export function ScannerDialog({ onClose, onImported }: ScannerDialogProps): Reac
   )
   const eaCandidates = useMemo(() => candidates.filter((c) => c.source === 'ea'), [candidates])
   const gogCandidates = useMemo(() => candidates.filter((c) => c.source === 'gog'), [candidates])
+  const xboxCandidates = useMemo(() => candidates.filter((c) => c.source === 'xbox'), [candidates])
   const registryCandidates = useMemo(
     () => candidates.filter((c) => c.source === 'registry'),
     [candidates]
@@ -160,6 +161,7 @@ export function ScannerDialog({ onClose, onImported }: ScannerDialogProps): Reac
             {renderGroup('Ubisoft-Connect-Spiele', ubisoftCandidates)}
             {renderGroup('EA-Spiele', eaCandidates)}
             {renderGroup('GOG-Spiele', gogCandidates)}
+            {renderGroup('Xbox/Microsoft-Store-Spiele', xboxCandidates)}
             {renderGroup('Installierte Programme', registryCandidates)}
           </div>
         )}

@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type { Entry, SavedView, Session, Tag } from '../main/store'
 import type { Candidate, ScanResult } from '../main/scanner'
+import type { SteamAchievement } from '../main/steamAchievements'
 import type { EntryStats, OverviewData, SmartSuggestion, WrappedData } from '../main/stats'
 import type { SyncResult } from '../main/sync'
 import type { UpdaterStatus } from '../main/updater'
@@ -41,6 +42,15 @@ const api = {
   },
   checkEntryPaths: (): Promise<Record<string, boolean>> => ipcRenderer.invoke('entries:checkPaths'),
   pickCustomIcon: (id: string): Promise<Entry[]> => ipcRenderer.invoke('entries:pickCustomIcon', id),
+  setLaunchScripts: (
+    id: string,
+    preLaunchCommand: string,
+    postLaunchCommand: string
+  ): Promise<Entry[]> =>
+    ipcRenderer.invoke('entries:setLaunchScripts', id, preLaunchCommand, postLaunchCommand),
+  pickEmulator: (id: string): Promise<Entry[]> => ipcRenderer.invoke('entries:pickEmulator', id),
+  clearEmulatorPath: (id: string): Promise<Entry[]> =>
+    ipcRenderer.invoke('entries:clearEmulatorPath', id),
 
   listTags: (): Promise<Tag[]> => ipcRenderer.invoke('tags:list'),
   addTag: (name: string): Promise<Tag[]> => ipcRenderer.invoke('tags:add', name),
@@ -101,6 +111,30 @@ const api = {
     const listener = (): void => callback()
     ipcRenderer.on('coverArt:openKeyDialog', listener)
     return () => ipcRenderer.removeListener('coverArt:openKeyDialog', listener)
+  },
+
+  getMetadataCredentials: (): Promise<{ clientId: string; clientSecret: string } | null> =>
+    ipcRenderer.invoke('metadata:get'),
+  setMetadataCredentials: (clientId: string, clientSecret: string): Promise<void> =>
+    ipcRenderer.invoke('metadata:set', clientId, clientSecret),
+  fetchMetadata: (id: string): Promise<Entry[]> => ipcRenderer.invoke('metadata:fetch', id),
+  fetchAllMissingMetadata: (): Promise<void> => ipcRenderer.invoke('metadata:fetchAllMissing'),
+  onOpenMetadataKeyDialog: (callback: () => void): (() => void) => {
+    const listener = (): void => callback()
+    ipcRenderer.on('metadata:openKeyDialog', listener)
+    return () => ipcRenderer.removeListener('metadata:openKeyDialog', listener)
+  },
+
+  getSteamAchievementsCredentials: (): Promise<{ apiKey: string; steamId: string } | null> =>
+    ipcRenderer.invoke('steamAchievements:get'),
+  setSteamAchievementsCredentials: (apiKey: string, steamId: string): Promise<void> =>
+    ipcRenderer.invoke('steamAchievements:set', apiKey, steamId),
+  fetchSteamAchievements: (appId: string): Promise<SteamAchievement[]> =>
+    ipcRenderer.invoke('steamAchievements:fetch', appId),
+  onOpenSteamAchievementsKeyDialog: (callback: () => void): (() => void) => {
+    const listener = (): void => callback()
+    ipcRenderer.on('steamAchievements:openKeyDialog', listener)
+    return () => ipcRenderer.removeListener('steamAchievements:openKeyDialog', listener)
   },
 
   getScreenshots: (id: string): Promise<string[]> =>

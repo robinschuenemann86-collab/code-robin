@@ -1,5 +1,6 @@
 import type { Entry, SavedView, Session, Tag } from '../main/store'
 import type { Candidate, ScanResult } from '../main/scanner'
+import type { SteamAchievement } from '../main/steamAchievements'
 import type { EntryStats, OverviewData, SmartSuggestion, WrappedData } from '../main/stats'
 import type { SyncResult } from '../main/sync'
 import type { UpdaterStatus } from '../main/updater'
@@ -24,6 +25,13 @@ export interface LauncherApi {
   onEntriesChanged: (callback: (entries: Entry[]) => void) => () => void
   checkEntryPaths: () => Promise<Record<string, boolean>>
   pickCustomIcon: (id: string) => Promise<Entry[]>
+  setLaunchScripts: (
+    id: string,
+    preLaunchCommand: string,
+    postLaunchCommand: string
+  ) => Promise<Entry[]>
+  pickEmulator: (id: string) => Promise<Entry[]>
+  clearEmulatorPath: (id: string) => Promise<Entry[]>
 
   listTags: () => Promise<Tag[]>
   addTag: (name: string) => Promise<Tag[]>
@@ -62,6 +70,17 @@ export interface LauncherApi {
   fetchAllMissingCoverArt: () => Promise<void>
   fetchCoverArtForSelected: (ids: string[]) => Promise<void>
   onOpenCoverArtKeyDialog: (callback: () => void) => () => void
+
+  getMetadataCredentials: () => Promise<{ clientId: string; clientSecret: string } | null>
+  setMetadataCredentials: (clientId: string, clientSecret: string) => Promise<void>
+  fetchMetadata: (id: string) => Promise<Entry[]>
+  fetchAllMissingMetadata: () => Promise<void>
+  onOpenMetadataKeyDialog: (callback: () => void) => () => void
+
+  getSteamAchievementsCredentials: () => Promise<{ apiKey: string; steamId: string } | null>
+  setSteamAchievementsCredentials: (apiKey: string, steamId: string) => Promise<void>
+  fetchSteamAchievements: (appId: string) => Promise<SteamAchievement[]>
+  onOpenSteamAchievementsKeyDialog: (callback: () => void) => () => void
 
   getScreenshots: (id: string) => Promise<string[]>
 

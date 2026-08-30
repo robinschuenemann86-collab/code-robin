@@ -11,10 +11,18 @@ export interface Entry {
   epicAppName: string | null
   battlenetCode: string | null
   ubisoftId: string | null
+  xboxAumid: string | null
   favorite: boolean
   rating: number
   order: number
   launchArgs: string | null
+  preLaunchCommand: string | null
+  postLaunchCommand: string | null
+  emulatorPath: string | null
+  description: string | null
+  genre: string | null
+  developer: string | null
+  releaseYear: number | null
 }
 
 export interface Tag {
@@ -46,12 +54,13 @@ export interface SavedView {
 export interface Candidate {
   key: string
   name: string
-  source: 'registry' | 'steam' | 'epic' | 'battlenet' | 'ubisoft' | 'ea' | 'gog'
+  source: 'registry' | 'steam' | 'epic' | 'battlenet' | 'ubisoft' | 'ea' | 'gog' | 'xbox'
   path: string
   steamAppId: string | null
   epicAppName: string | null
   battlenetCode: string | null
   ubisoftId: string | null
+  xboxAumid: string | null
   expectedProcessName: string | null
   iconHash: string | null
   alreadyImported: boolean

@@ -28,6 +28,10 @@ const EntrySchema = z.object({
   // Analog für Ubisoft-Connect-Titel: uplay://launch/<id>/0. Die id kommt aus
   // dem Registry-Schlüssel HKLM\...\Ubisoft\Launcher\Installs\<id>.
   ubisoftId: z.string().nullable().default(null),
+  // Analog für Xbox-/Microsoft-Store-Titel (UWP, z. B. Game Pass): die volle
+  // "Application User Model Id" (PackageFamilyName!AppId), gestartet über
+  // `explorer.exe shell:appsFolder\<aumid>` statt einer normalen exe.
+  xboxAumid: z.string().nullable().default(null),
   favorite: z.boolean().default(false),
   // Eigene 1-5-Sterne-Bewertung, unabhängig vom Favoriten-Stern. 0 = noch
   // nicht bewertet.
@@ -42,7 +46,20 @@ const EntrySchema = z.object({
   // Kommandozeilen-Parameter, die beim direkten Start (nicht bei Steam/Epic/
   // Battle.net) an das Programm übergeben werden. Als Text statt Array
   // gespeichert, weil der Nutzer sie so eintippt — siehe entries.ts parseArgs.
-  launchArgs: z.string().nullable().default(null)
+  launchArgs: z.string().nullable().default(null),
+  // Optionaler Befehl vor/nach dem Start (z. B. Controller-Profil laden,
+  // Discord stummschalten) — ebenfalls als Text, siehe entries.ts parseCommand.
+  preLaunchCommand: z.string().nullable().default(null),
+  postLaunchCommand: z.string().nullable().default(null),
+  // Für Emulator-/ROM-Einträge: statt `path` direkt zu starten, wird dieses
+  // Programm mit `path` als erstem Argument aufgerufen.
+  emulatorPath: z.string().nullable().default(null),
+  // Von IGDB nachgeladene Textmetadaten (siehe metadata.ts) — description
+  // dient zugleich als Marker, ob für diesen Eintrag schon gesucht wurde.
+  description: z.string().nullable().default(null),
+  genre: z.string().nullable().default(null),
+  developer: z.string().nullable().default(null),
+  releaseYear: z.number().nullable().default(null)
 })
 
 const TagSchema = z.object({

@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactElement } from 'react'
 import type { Entry, EntryStats, Tag } from '../types'
 import type { Session } from '../../../main/store'
+import type { SteamAchievement } from '../../../main/steamAchievements'
 import { EntryIcon } from './EntryIcon'
 import { extractAccentColor } from '../colorExtraction'
 import {
@@ -38,6 +39,10 @@ interface DetailPanelProps {
   onSetRating: (id: string, rating: number) => void
   onRemove: (entry: Entry) => void
   onClose: () => void
+  onSetLaunchScripts: (id: string, preLaunchCommand: string, postLaunchCommand: string) => void
+  onPickEmulator: (id: string) => void
+  onClearEmulatorPath: (id: string) => void
+  onFetchMetadata: (id: string) => void
 }
 
 function formatDuration(ms: number): string {
@@ -62,16 +67,24 @@ export function DetailPanel({
   onToggleFavorite,
   onSetRating,
   onRemove,
-  onClose
+  onClose,
+  onSetLaunchScripts,
+  onPickEmulator,
+  onClearEmulatorPath,
+  onFetchMetadata
 }: DetailPanelProps): ReactElement {
   const [editingName, setEditingName] = useState(false)
   const [name, setName] = useState(entry.name)
   const [launchArgs, setLaunchArgsValue] = useState(entry.launchArgs ?? '')
+  const [preLaunchCommand, setPreLaunchCommand] = useState(entry.preLaunchCommand ?? '')
+  const [postLaunchCommand, setPostLaunchCommand] = useState(entry.postLaunchCommand ?? '')
   const [size, setSize] = useState<number | null | 'loading'>('loading')
   const [sessions, setSessions] = useState<Session[]>([])
   const [accentColor, setAccentColor] = useState<string | null>(null)
   const [screenshots, setScreenshots] = useState<string[]>([])
   const [lightboxHash, setLightboxHash] = useState<string | null>(null)
+  const [achievements, setAchievements] = useState<SteamAchievement[]>([])
+  const [achievementsError, setAchievementsError] = useState<string | null>(null)
   const canUseLaunchArgs = !entry.steamAppId && !entry.epicAppName && !entry.battlenetCode
 
   useEffect(() => {
@@ -110,6 +123,33 @@ export function DetailPanel({
     window.api.getScreenshots(entry.id).then(setScreenshots)
   }, [entry.id, entry.steamAppId])
 
+  // Nur ein Fetch-Versuch, wenn Zugangsdaten hinterlegt sind — sonst bliebe
+  // die Fehlermeldung "keine Zugangsdaten" bei jedem Steam-Spiel sichtbar,
+  // obwohl das Feature bewusst inaktiv ist, bis Zugangsdaten eingetragen wurden.
+  useEffect(() => {
+    setAchievements([])
+    setAchievementsError(null)
+    const steamAppId = entry.steamAppId
+    if (!steamAppId) return
+    let cancelled = false
+    window.api.getSteamAchievementsCredentials().then((credentials) => {
+      if (cancelled || !credentials) return
+      window.api.fetchSteamAchievements(steamAppId).then(
+        (result) => {
+          if (!cancelled) setAchievements(result)
+        },
+        (error) => {
+          if (!cancelled) {
+            setAchievementsError(error instanceof Error ? error.message : String(error))
+          }
+        }
+      )
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [entry.id, entry.steamAppId])
+
   function commitName(): void {
     const trimmed = name.trim()
     if (trimmed && trimmed !== entry.name) onRename(entry.id, trimmed)
@@ -119,6 +159,15 @@ export function DetailPanel({
   function commitLaunchArgs(): void {
     if (launchArgs.trim() !== (entry.launchArgs ?? '')) {
       onSetLaunchArgs(entry.id, launchArgs)
+    }
+  }
+
+  function commitLaunchScripts(): void {
+    if (
+      preLaunchCommand.trim() !== (entry.preLaunchCommand ?? '') ||
+      postLaunchCommand.trim() !== (entry.postLaunchCommand ?? '')
+    ) {
+      onSetLaunchScripts(entry.id, preLaunchCommand, postLaunchCommand)
     }
   }
 
@@ -268,6 +317,24 @@ export function DetailPanel({
         </span>
       </div>
 
+      {entry.description ? (
+        <div className="flex flex-col gap-1.5">
+          <span className="font-display text-[11px] font-bold tracking-wider text-text-muted">
+            {[entry.genre, entry.developer, entry.releaseYear?.toString()]
+              .filter(Boolean)
+              .join(' · ') || 'INFO'}
+          </span>
+          <p className="text-xs leading-relaxed text-text-muted">{entry.description}</p>
+        </div>
+      ) : (
+        <button
+          onClick={() => onFetchMetadata(entry.id)}
+          className="w-full rounded-lg border border-border bg-panel px-2 py-1.5 text-left text-xs text-text-muted transition hover:border-gold/50 hover:text-gold"
+        >
+          Metadaten laden …
+        </button>
+      )}
+
       {canUseLaunchArgs && (
         <div className="flex flex-col gap-1.5">
           <span className="font-display text-[11px] font-bold tracking-wider text-text-muted">
@@ -286,6 +353,64 @@ export function DetailPanel({
           />
         </div>
       )}
+
+      <div className="flex flex-col gap-1.5">
+        <span className="font-display text-[11px] font-bold tracking-wider text-text-muted">
+          EMULATOR
+        </span>
+        {entry.emulatorPath ? (
+          <div className="flex items-center gap-2">
+            <span
+              className="flex-1 truncate rounded-lg border border-border bg-panel p-2 font-mono text-xs text-text"
+              title={entry.emulatorPath}
+            >
+              {entry.emulatorPath}
+            </span>
+            <button
+              onClick={() => onClearEmulatorPath(entry.id)}
+              title="Emulator entfernen"
+              className="shrink-0 text-text-muted hover:text-gold"
+            >
+              <IconX className="h-4 w-4" />
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={() => onPickEmulator(entry.id)}
+            className="w-full rounded-lg border border-border bg-panel px-2 py-1.5 text-left text-xs text-text-muted transition hover:border-gold/50 hover:text-gold"
+          >
+            Emulator auswählen …
+          </button>
+        )}
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        <span className="font-display text-[11px] font-bold tracking-wider text-text-muted">
+          START-SKRIPTE
+        </span>
+        <input
+          value={preLaunchCommand}
+          onChange={(e) => setPreLaunchCommand(e.target.value)}
+          onBlur={commitLaunchScripts}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') e.currentTarget.blur()
+            if (e.key === 'Escape') setPreLaunchCommand(entry.preLaunchCommand ?? '')
+          }}
+          placeholder="Vor dem Start ausführen …"
+          className="w-full rounded-lg border border-border bg-panel px-2 py-1.5 font-mono text-xs text-text outline-none focus:border-gold/50"
+        />
+        <input
+          value={postLaunchCommand}
+          onChange={(e) => setPostLaunchCommand(e.target.value)}
+          onBlur={commitLaunchScripts}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') e.currentTarget.blur()
+            if (e.key === 'Escape') setPostLaunchCommand(entry.postLaunchCommand ?? '')
+          }}
+          placeholder="Nach dem Start ausführen …"
+          className="w-full rounded-lg border border-border bg-panel px-2 py-1.5 font-mono text-xs text-text outline-none focus:border-gold/50"
+        />
+      </div>
 
       <div className="flex items-center gap-2 text-xs text-text-muted">
         <IconCalendar className="h-4 w-4 shrink-0" />
@@ -341,6 +466,51 @@ export function DetailPanel({
               </button>
             ))}
           </div>
+        </div>
+      )}
+
+      {(achievements.length > 0 || achievementsError) && (
+        <div className="flex flex-col gap-1.5">
+          <span className="font-display text-[11px] font-bold tracking-wider text-text-muted">
+            ERFOLGE
+            {achievements.length > 0 &&
+              ` (${achievements.filter((a) => a.achieved).length}/${achievements.length})`}
+          </span>
+          {achievementsError ? (
+            <p className="text-xs text-text-muted">{achievementsError}</p>
+          ) : (
+            <div className="flex max-h-48 flex-col gap-1.5 overflow-y-auto pr-1">
+              {achievements.map((a) => (
+                <div
+                  key={a.apiName}
+                  className={`flex items-center gap-2 rounded-lg border border-border bg-panel p-1.5 ${
+                    a.achieved ? '' : 'opacity-50'
+                  }`}
+                >
+                  {a.iconHash ? (
+                    <img
+                      src={`launcher-icon://${a.iconHash}`}
+                      alt=""
+                      className="h-8 w-8 shrink-0 rounded"
+                    />
+                  ) : (
+                    <div className="h-8 w-8 shrink-0 rounded bg-panel-hover" />
+                  )}
+                  <div className="flex min-w-0 flex-col">
+                    <span className="truncate text-xs text-text" title={a.name}>
+                      {a.name}
+                    </span>
+                    <span
+                      className="truncate text-[11px] text-text-muted"
+                      title={a.description}
+                    >
+                      {a.description}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 

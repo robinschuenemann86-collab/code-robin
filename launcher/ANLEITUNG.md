@@ -8,8 +8,8 @@ Willkommen bei MR Launch! Hier die wichtigsten Funktionen auf einen Blick.
   Auch per Drag & Drop: einfach eine `.exe`- oder `.lnk`-Datei ins Fenster ziehen.
 - **Programme suchen**: Der Lupen-Knopf durchsucht deinen PC automatisch nach
   installierten Spielen und Programmen (Registry, Steam, Epic, Battle.net,
-  Ubisoft Connect, EA/Origin, GOG Galaxy) und zeigt sie zur Auswahl an, bevor
-  irgendetwas übernommen wird.
+  Ubisoft Connect, EA/Origin, GOG Galaxy, Xbox/Microsoft Store) und zeigt sie
+  zur Auswahl an, bevor irgendetwas übernommen wird.
 
 ## Ordnung halten
 
@@ -28,6 +28,26 @@ Willkommen bei MR Launch! Hier die wichtigsten Funktionen auf einen Blick.
 - Für die meisten Spiele wird automatisch ein Cover-Bild geladen. Fehlt eins,
   hilft "Fehlende Cover-Art nachladen" im "…"-Menü oben rechts, um es für alle
   betroffenen Programme auf einmal nachzuholen.
+
+## Start-Skripte & Emulatoren
+
+- **Start-Skripte**: im Detail-Panel lässt sich ein Befehl eintragen, der vor
+  bzw. nach dem Start eines Programms automatisch ausgeführt wird (z. B. ein
+  Controller-Profil laden).
+- **Emulator-Unterstützung**: im Detail-Panel unter "Emulator" einen Emulator
+  auswählen — MR Launch startet dann den Emulator mit dem Programm (z. B. der
+  ROM-Datei) als Argument, statt es direkt auszuführen.
+
+## Metadaten & Erfolge (optional, eigene Zugangsdaten nötig)
+
+- **IGDB-Metadaten**: Beschreibung, Genre, Entwickler und Erscheinungsjahr im
+  Detail-Panel. Dafür über "…" → "IGDB-Metadaten…" kostenlose Zugangsdaten von
+  Twitch/IGDB eintragen (dev.twitch.tv/console/apps). Ohne eingetragene
+  Zugangsdaten bleibt diese Funktion einfach unsichtbar.
+- **Steam-Erfolge**: echte Erfolge (freigeschaltet/gesperrt, mit Icon) im
+  Detail-Panel bei Steam-Titeln. Dafür über "…" → "Steam-Erfolge…" einen
+  kostenlosen Steam-API-Key (steamcommunity.com/dev/apikey) und die eigene
+  SteamID64 eintragen. Das Steam-Profil muss dafür auf "Öffentlich" stehen.
 
 ## Spielzeit & Statistik
 

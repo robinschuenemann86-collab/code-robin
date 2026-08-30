@@ -11,6 +11,7 @@ import { setDiscordPresence } from './discordPresence'
 import { showOverlay } from './overlayWindow'
 import { setTrayRunningEntry } from './tray'
 import { fetchCoverArtForNewEntries } from './coverArt'
+import { fetchMetadataForNewEntries } from './metadata'
 
 function deriveName(targetPath: string): string {
   return basename(targetPath, extname(targetPath))
@@ -67,11 +68,19 @@ async function addEntriesFromPaths(paths: string[]): Promise<Entry[]> {
       epicAppName: null,
       battlenetCode: null,
       ubisoftId: null,
+      xboxAumid: null,
       favorite: false,
       rating: 0,
       expectedProcessName: basename(resolvedPath),
       order: (order += 1000),
-      launchArgs: null
+      launchArgs: null,
+      preLaunchCommand: null,
+      postLaunchCommand: null,
+      emulatorPath: null,
+      description: null,
+      genre: null,
+      developer: null,
+      releaseYear: null
     })
     existingPaths.add(pathKey(resolvedPath))
   }
@@ -127,6 +136,58 @@ function setLaunchArgs(id: string, args: string): Entry[] {
   const trimmed = args.trim()
   const updated = [...entries]
   updated[index] = { ...updated[index], launchArgs: trimmed || null }
+  setEntries(updated)
+  return updated
+}
+
+function setLaunchScripts(
+  id: string,
+  preLaunchCommand: string,
+  postLaunchCommand: string
+): Entry[] {
+  const entries = getStore().get('entries')
+  const index = entries.findIndex((entry) => entry.id === id)
+  if (index === -1) {
+    throw new Error('Eintrag wurde nicht gefunden.')
+  }
+  const updated = [...entries]
+  updated[index] = {
+    ...updated[index],
+    preLaunchCommand: preLaunchCommand.trim() || null,
+    postLaunchCommand: postLaunchCommand.trim() || null
+  }
+  setEntries(updated)
+  return updated
+}
+
+async function pickEmulator(window: BrowserWindow, id: string): Promise<Entry[]> {
+  const entries = getStore().get('entries')
+  const index = entries.findIndex((entry) => entry.id === id)
+  if (index === -1) {
+    throw new Error('Eintrag wurde nicht gefunden.')
+  }
+
+  const result = await dialog.showOpenDialog(window, {
+    title: 'Emulator auswählen',
+    properties: ['openFile'],
+    filters: [{ name: 'Programme', extensions: ['exe'] }]
+  })
+  if (result.canceled || result.filePaths.length === 0) return entries
+
+  const updated = [...entries]
+  updated[index] = { ...updated[index], emulatorPath: result.filePaths[0] }
+  setEntries(updated)
+  return updated
+}
+
+function clearEmulatorPath(id: string): Entry[] {
+  const entries = getStore().get('entries')
+  const index = entries.findIndex((entry) => entry.id === id)
+  if (index === -1) {
+    throw new Error('Eintrag wurde nicht gefunden.')
+  }
+  const updated = [...entries]
+  updated[index] = { ...updated[index], emulatorPath: null }
   setEntries(updated)
   return updated
 }
@@ -289,6 +350,8 @@ export async function launchEntry(id: string): Promise<void> {
   if (!entry) {
     throw new Error('Eintrag wurde nicht gefunden.')
   }
+  runSideCommand(entry.preLaunchCommand)
+
   // Steam-, Epic-, Battle.net- und Ubisoft-Spiele laufen über den jeweiligen
   // Client, nicht per direktem Programmstart — sonst fehlen Overlay,
   // Cloud-Saves, Achievements und ggf. der Anti-Cheat-Unterbau/DRM-Check.
@@ -302,10 +365,20 @@ export async function launchEntry(id: string): Promise<void> {
     await shell.openExternal(`battlenet://${entry.battlenetCode}`)
   } else if (entry.ubisoftId) {
     await shell.openExternal(`uplay://launch/${entry.ubisoftId}/0`)
+  } else if (entry.xboxAumid) {
+    // UWP-/Xbox-Titel haben keine direkt ausführbare Datei im üblichen Sinn —
+    // der Explorer kennt "shell:appsFolder\<aumid>" und startet die App darüber.
+    await spawnDetached('explorer.exe', undefined, [`shell:appsFolder\\${entry.xboxAumid}`])
+  } else if (entry.emulatorPath) {
+    await spawnDetached(entry.emulatorPath, dirname(entry.emulatorPath), [
+      entry.path,
+      ...parseArgs(entry.launchArgs)
+    ])
   } else {
     await spawnDetached(entry.path, dirname(entry.path), parseArgs(entry.launchArgs))
   }
 
+  runSideCommand(entry.postLaunchCommand)
   startSession(entry.id, entry.expectedProcessName)
   // Nur wenn wirklich eine Sitzung getrackt wird (siehe startSession-Guard) —
   // sonst würde "Spielt gerade X" nie wieder verschwinden, weil auch das
@@ -333,7 +406,7 @@ function parseArgs(raw: string | null): string[] {
 // wird das zu einer unbehandelten Exception im Main-Prozess — die ganze App
 // stürzt ab, statt dass der Start einfach fehlschlägt und der Renderer eine
 // Fehlermeldung zeigen kann.
-function spawnDetached(path: string, cwd: string, args: string[] = []): Promise<void> {
+function spawnDetached(path: string, cwd: string | undefined, args: string[] = []): Promise<void> {
   return new Promise((resolve, reject) => {
     const child = spawn(path, args, { detached: true, stdio: 'ignore', cwd })
     child.once('error', reject)
@@ -342,6 +415,30 @@ function spawnDetached(path: string, cwd: string, args: string[] = []): Promise<
       resolve()
     })
   })
+}
+
+// Trennt einen frei eingegebenen Vor-/Nach-Start-Befehl in Programm (erstes
+// Token) und Argumente, mit demselben tolerantem Tokenizer wie parseArgs.
+function parseCommand(raw: string | null): { path: string; args: string[] } | null {
+  const tokens = parseArgs(raw)
+  if (tokens.length === 0) return null
+  const [path, ...args] = tokens
+  return { path, args }
+}
+
+// Vor-/Nach-Start-Befehle sind reine Komfortfunktion (z. B. Controller-Profil
+// laden, Discord stummschalten) — ein Fehler darin darf den eigentlichen
+// Programmstart nie verhindern oder verzögern, daher bewusst nicht awaiten.
+function runSideCommand(raw: string | null): void {
+  const command = parseCommand(raw)
+  if (!command) return
+  try {
+    const child = spawn(command.path, command.args, { detached: true, stdio: 'ignore' })
+    child.once('error', () => {})
+    child.unref()
+  } catch {
+    // bewusst ignoriert — siehe Kommentar oben
+  }
 }
 
 // Läuft rekursiv einen Ordner ab und summiert die Dateigrößen. Einzelne
@@ -447,6 +544,9 @@ function triggerCoverArtForNewEntries(
   void fetchCoverArtForNewEntries(newIds, (entries) =>
     getWindow()?.webContents.send('entries:changed', entries)
   )
+  void fetchMetadataForNewEntries(newIds, (entries) =>
+    getWindow()?.webContents.send('entries:changed', entries)
+  )
 }
 
 export function registerEntryHandlers(getWindow: () => BrowserWindow | null): void {
@@ -519,4 +619,20 @@ export function registerEntryHandlers(getWindow: () => BrowserWindow | null): vo
     }
     return pickCustomIcon(window, id)
   })
+
+  ipcMain.handle(
+    'entries:setLaunchScripts',
+    (_event, id: string, preLaunchCommand: string, postLaunchCommand: string) =>
+      setLaunchScripts(id, preLaunchCommand, postLaunchCommand)
+  )
+
+  ipcMain.handle('entries:pickEmulator', (_event, id: string) => {
+    const window = getWindow()
+    if (!window) {
+      throw new Error('Kein Fenster verfügbar.')
+    }
+    return pickEmulator(window, id)
+  })
+
+  ipcMain.handle('entries:clearEmulatorPath', (_event, id: string) => clearEmulatorPath(id))
 }

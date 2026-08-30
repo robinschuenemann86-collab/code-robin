@@ -91,7 +91,7 @@ function significantWords(name: string): Set<string> {
 // Beginnings" passen, nur weil beide "beginnings" enthalten. Verlangt
 // stattdessen eine Mehrheits-Übereinstimmung der bedeutungstragenden Wörter
 // in beide Richtungen (Jaccard-Ähnlichkeit).
-function namesLikelyMatch(searched: string, candidate: string): boolean {
+export function namesLikelyMatch(searched: string, candidate: string): boolean {
   const a = significantWords(searched)
   const b = significantWords(candidate)
   if (a.size === 0 || b.size === 0) return true

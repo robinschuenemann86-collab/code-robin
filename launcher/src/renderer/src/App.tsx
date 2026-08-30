@@ -27,6 +27,8 @@ import { ScannerDialog } from './components/ScannerDialog'
 import { StatsDialog } from './components/StatsDialog'
 import { OverviewDialog } from './components/OverviewDialog'
 import { CoverArtKeyDialog } from './components/CoverArtKeyDialog'
+import { MetadataKeyDialog } from './components/MetadataKeyDialog'
+import { SteamAchievementsKeyDialog } from './components/SteamAchievementsKeyDialog'
 import { HelpDialog } from './components/HelpDialog'
 import { ConfirmDialog } from './components/ConfirmDialog'
 import { EntryContextMenu } from './components/EntryContextMenu'
@@ -93,6 +95,8 @@ function App(): ReactElement {
   const [overviewOpen, setOverviewOpen] = useState(false)
   const [overview, setOverview] = useState<OverviewData | null>(null)
   const [coverArtKeyDialogOpen, setCoverArtKeyDialogOpen] = useState(false)
+  const [metadataKeyDialogOpen, setMetadataKeyDialogOpen] = useState(false)
+  const [steamAchievementsKeyDialogOpen, setSteamAchievementsKeyDialogOpen] = useState(false)
   const [syncDialogOpen, setSyncDialogOpen] = useState(false)
   const [helpOpen, setHelpOpen] = useState(false)
   const [pendingConfirm, setPendingConfirm] = useState<{
@@ -199,6 +203,16 @@ function App(): ReactElement {
 
   useEffect(() => {
     return window.api.onOpenCoverArtKeyDialog(() => setCoverArtKeyDialogOpen(true))
+  }, [])
+
+  useEffect(() => {
+    return window.api.onOpenMetadataKeyDialog(() => setMetadataKeyDialogOpen(true))
+  }, [])
+
+  useEffect(() => {
+    return window.api.onOpenSteamAchievementsKeyDialog(() =>
+      setSteamAchievementsKeyDialogOpen(true)
+    )
   }, [])
 
   useEffect(() => {
@@ -494,9 +508,33 @@ function App(): ReactElement {
     setEntries(await window.api.pickCustomIcon(id))
   }
 
+  async function handleSetLaunchScripts(
+    id: string,
+    preLaunchCommand: string,
+    postLaunchCommand: string
+  ): Promise<void> {
+    setEntries(await window.api.setLaunchScripts(id, preLaunchCommand, postLaunchCommand))
+  }
+
+  async function handlePickEmulator(id: string): Promise<void> {
+    setEntries(await window.api.pickEmulator(id))
+  }
+
+  async function handleClearEmulatorPath(id: string): Promise<void> {
+    setEntries(await window.api.clearEmulatorPath(id))
+  }
+
   async function handleFetchCoverArt(id: string): Promise<void> {
     try {
       setEntries(await window.api.fetchCoverArt(id))
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : String(error))
+    }
+  }
+
+  async function handleFetchMetadata(id: string): Promise<void> {
+    try {
+      setEntries(await window.api.fetchMetadata(id))
     } catch (error) {
       setStatus(error instanceof Error ? error.message : String(error))
     }
@@ -1311,6 +1349,10 @@ function App(): ReactElement {
             onSetRating={handleSetRating}
             onRemove={handleDelete}
             onClose={() => setSelectedEntryId(null)}
+            onSetLaunchScripts={handleSetLaunchScripts}
+            onPickEmulator={handlePickEmulator}
+            onClearEmulatorPath={handleClearEmulatorPath}
+            onFetchMetadata={handleFetchMetadata}
           />
         )}
       </div>
@@ -1404,6 +1446,14 @@ function App(): ReactElement {
 
       {coverArtKeyDialogOpen && (
         <CoverArtKeyDialog onClose={() => setCoverArtKeyDialogOpen(false)} />
+      )}
+
+      {metadataKeyDialogOpen && (
+        <MetadataKeyDialog onClose={() => setMetadataKeyDialogOpen(false)} />
+      )}
+
+      {steamAchievementsKeyDialogOpen && (
+        <SteamAchievementsKeyDialog onClose={() => setSteamAchievementsKeyDialogOpen(false)} />
       )}
 
       {syncDialogOpen && (

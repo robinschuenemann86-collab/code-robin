@@ -110,6 +110,31 @@ export async function ensureScreenshotCached(imagePath: string): Promise<string 
   }
 }
 
+// Lädt ein entferntes Bild (z. B. ein Steam-Erfolgs-Icon) genau einmal pro
+// URL herunter und cacht es unter dem Hash der URL — die strikte CSP der App
+// erlaubt keine direkten https-Bildquellen, daher muss jedes Remote-Bild
+// zuerst lokal landen, bevor es über launcher-icon://<hash> angezeigt werden kann.
+export async function ensureRemoteImageCached(url: string): Promise<string | null> {
+  const hash = hashPath(url)
+  const file = iconFilePath(hash)
+
+  if (existsSync(file)) {
+    return hash
+  }
+
+  try {
+    const response = await fetch(url)
+    if (!response.ok) return null
+    const buffer = Buffer.from(await response.arrayBuffer())
+    const image = nativeImage.createFromBuffer(buffer)
+    if (image.isEmpty()) return null
+    await fs.writeFile(file, image.toPNG())
+    return hash
+  } catch {
+    return null
+  }
+}
+
 export async function removeCachedIcon(hash: string): Promise<void> {
   const file = iconFilePath(hash)
   try {
