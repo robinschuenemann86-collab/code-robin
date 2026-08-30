@@ -31,9 +31,11 @@ import { HelpDialog } from './components/HelpDialog'
 import { ConfirmDialog } from './components/ConfirmDialog'
 import { EntryContextMenu } from './components/EntryContextMenu'
 import { SyncDialog } from './components/SyncDialog'
+import { ConfettiBurst } from './components/ConfettiBurst'
 import { DiceRollOverlay } from './components/DiceRollOverlay'
 import { isSoundEnabled, playLaunchSound, playSuccessSound, setSoundEnabled } from './sounds'
 import {
+  distinctPlatformCount,
   loadSeenAchievementIds,
   saveSeenAchievementIds,
   unlockedAchievements,
@@ -78,6 +80,14 @@ function App(): ReactElement {
   const [stats, setStats] = useState<EntryStats[]>([])
   const [loading, setLoading] = useState(true)
   const [status, setStatus] = useState('')
+
+  // Statuszeile blendet sich nach kurzer Zeit von selbst aus, statt bis zur
+  // nächsten Aktion stehen zu bleiben.
+  useEffect(() => {
+    if (!status) return
+    const timeout = setTimeout(() => setStatus(''), 5000)
+    return () => clearTimeout(timeout)
+  }, [status])
   const [scannerOpen, setScannerOpen] = useState(false)
   const [statsOpen, setStatsOpen] = useState(false)
   const [overviewOpen, setOverviewOpen] = useState(false)
@@ -94,6 +104,8 @@ function App(): ReactElement {
     null
   )
   const [diceRollPool, setDiceRollPool] = useState<Entry[] | null>(null)
+  const searchInputRef = useRef<HTMLInputElement>(null)
+  const [showConfetti, setShowConfetti] = useState(false)
   const [updaterStatus, setUpdaterStatus] = useState<UpdaterStatus | null>(null)
   const [bigPictureMode, setBigPictureMode] = useState(false)
 
@@ -113,9 +125,21 @@ function App(): ReactElement {
   const [dragOverEntryId, setDragOverEntryId] = useState<string | null>(null)
   const [runningIds, setRunningIds] = useState<Set<string>>(new Set())
   const [savedViews, setSavedViews] = useState<SavedView[]>([])
-  const [coverArtNudgeDismissed, setCoverArtNudgeDismissed] = useState(false)
+  const [coverArtNudgeDismissed, setCoverArtNudgeDismissedState] = useState(
+    () => localStorage.getItem('coverArtNudgeDismissed') === 'true'
+  )
+  function setCoverArtNudgeDismissed(value: boolean): void {
+    localStorage.setItem('coverArtNudgeDismissed', String(value))
+    setCoverArtNudgeDismissedState(value)
+  }
   const [smartSuggestion, setSmartSuggestion] = useState<SmartSuggestion | null>(null)
-  const [suggestionDismissed, setSuggestionDismissed] = useState(false)
+  const [suggestionDismissed, setSuggestionDismissedState] = useState(
+    () => localStorage.getItem('suggestionDismissed') === 'true'
+  )
+  function setSuggestionDismissed(value: boolean): void {
+    localStorage.setItem('suggestionDismissed', String(value))
+    setSuggestionDismissedState(value)
+  }
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [lastClickedIndex, setLastClickedIndex] = useState<number | null>(null)
 
@@ -234,7 +258,8 @@ function App(): ReactElement {
       totalLaunches: stats.reduce((sum, s) => sum + s.launchCount, 0),
       streakDays: overview?.streakDays ?? 0,
       favoriteCount: entries.filter((e) => e.favorite).length,
-      tagCount: tags.length
+      tagCount: tags.length,
+      distinctPlatformCount: distinctPlatformCount(entries)
     }
     const unlocked = unlockedAchievements(context)
     const seen = seenAchievementsRef.current
@@ -251,6 +276,8 @@ function App(): ReactElement {
         : `🏆 ${freshlyUnlocked.length} neue Erfolge freigeschaltet!`
     )
     playSuccessSound()
+    setShowConfetti(true)
+    setTimeout(() => setShowConfetti(false), 1800)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [entries, stats, tags, overview])
 
@@ -494,12 +521,17 @@ function App(): ReactElement {
     await window.api.installUpdate()
   }
 
-  function handleRandomPick(): void {
-    if (filteredEntries.length === 0) {
-      setStatus('Keine Programme in der aktuellen Ansicht.')
+  function handleRandomPick(e: ReactMouseEvent): void {
+    const pool = e.shiftKey ? filteredEntries.filter((entry) => entry.favorite) : filteredEntries
+    if (pool.length === 0) {
+      setStatus(
+        e.shiftKey
+          ? 'Keine Favoriten in der aktuellen Ansicht.'
+          : 'Keine Programme in der aktuellen Ansicht.'
+      )
       return
     }
-    setDiceRollPool(filteredEntries)
+    setDiceRollPool(pool)
   }
 
   function handleDiceRollDone(pick: Entry): void {
@@ -632,6 +664,12 @@ function App(): ReactElement {
       const activeTag = document.activeElement?.tagName
       if (activeTag === 'INPUT' || activeTag === 'TEXTAREA' || activeTag === 'SELECT') return
 
+      if (e.key === '/') {
+        e.preventDefault()
+        searchInputRef.current?.focus()
+        return
+      }
+
       if (e.key === 'Escape' && selectedIds.size > 0) {
         e.preventDefault()
         setSelectedIds(new Set())
@@ -753,7 +791,7 @@ function App(): ReactElement {
           </button>
           <button
             onClick={handleRandomPick}
-            title="Was soll ich spielen?"
+            title="Was soll ich spielen? (Umschalt+Klick: nur Favoriten)"
             className="rounded-lg border border-border bg-panel p-2.5 text-text transition hover:border-gold/50 hover:text-gold"
           >
             <IconDice />
@@ -866,6 +904,8 @@ function App(): ReactElement {
           onTagFilterModeChange={setTagFilterMode}
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
+          searchInputRef={searchInputRef}
+          resultCount={filteredEntries.length}
           viewMode={viewMode}
           onViewModeChange={setViewMode}
           favoritesOnly={favoritesOnly}
@@ -912,17 +952,29 @@ function App(): ReactElement {
                     key={entry.id}
                     onClick={() => setSelectedEntryId(entry.id)}
                     onDoubleClick={() => handleLaunch(entry)}
+                    onContextMenu={(e) => {
+                      e.preventDefault()
+                      setSelectedEntryId(entry.id)
+                      setContextMenu({ entry, x: e.clientX, y: e.clientY })
+                    }}
                     className={`flex w-28 shrink-0 flex-col items-center gap-2 rounded-xl border p-3 text-center transition ${
                       selectedEntryId === entry.id
                         ? 'glow-gold border-gold/60 bg-panel-active'
                         : 'border-border bg-panel hover:border-gold/30 hover:bg-panel-hover'
                     }`}
                   >
-                    <EntryIcon
-                      iconHash={entry.iconHash}
-                      coverHash={entry.coverHash}
-                      className="aspect-[2/3] w-full"
-                    />
+                    <div className="relative w-full">
+                      <EntryIcon
+                        iconHash={entry.iconHash}
+                        coverHash={entry.coverHash}
+                        className="aspect-[2/3] w-full"
+                      />
+                      {isNewEntry(entry) && (
+                        <span className="absolute -right-1 -top-1 rounded-full ember-grad-bg px-1.5 py-0.5 text-[9px] font-semibold leading-none text-on-ember">
+                          NEU
+                        </span>
+                      )}
+                    </div>
                     <span className="w-full truncate text-xs font-medium">{entry.name}</span>
                   </button>
                 ))}
@@ -1296,6 +1348,8 @@ function App(): ReactElement {
       )}
 
       {diceRollPool && <DiceRollOverlay entries={diceRollPool} onDone={handleDiceRollDone} />}
+
+      {showConfetti && <ConfettiBurst />}
 
       {contextMenu && (
         <EntryContextMenu

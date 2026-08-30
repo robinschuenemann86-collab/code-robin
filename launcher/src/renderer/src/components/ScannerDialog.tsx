@@ -48,6 +48,14 @@ export function ScannerDialog({ onClose, onImported }: ScannerDialogProps): Reac
     [candidates]
   )
 
+  function selectAll(): void {
+    setSelectedKeys(new Set(candidates.filter((c) => !c.alreadyImported).map((c) => c.key)))
+  }
+
+  function selectNone(): void {
+    setSelectedKeys(new Set())
+  }
+
   function toggle(key: string): void {
     setSelectedKeys((prev) => {
       const next = new Set(prev)
@@ -124,6 +132,20 @@ export function ScannerDialog({ onClose, onImported }: ScannerDialogProps): Reac
               ))}
             </ul>
           </details>
+        )}
+
+        {!loading && candidates.length > 0 && (
+          <div className="flex items-center gap-3 text-xs">
+            <button onClick={selectAll} className="font-semibold text-gold hover:brightness-125">
+              Alle auswählen
+            </button>
+            <button
+              onClick={selectNone}
+              className="font-semibold text-text-muted hover:text-gold"
+            >
+              Keine auswählen
+            </button>
+          </div>
         )}
 
         {loading ? (

@@ -140,7 +140,7 @@ export function DetailPanel({
       <div className="flex items-center justify-between">
         <button
           onClick={() => onToggleFavorite(entry)}
-          title="Favorit"
+          title="Favorit (F)"
           className={entry.favorite ? 'text-amber' : 'text-text-muted hover:text-amber'}
         >
           <IconStar className="h-4 w-4" filled={entry.favorite} />

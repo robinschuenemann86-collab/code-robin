@@ -1,4 +1,4 @@
-import type { ReactElement } from 'react'
+import { useEffect, type ReactElement } from 'react'
 import { useEscapeToClose } from '../hooks'
 
 interface ConfirmDialogProps {
@@ -17,6 +17,14 @@ export function ConfirmDialog({
   onCancel
 }: ConfirmDialogProps): ReactElement {
   useEscapeToClose(onCancel)
+
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent): void {
+      if (e.key === 'Enter') onConfirm()
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [onConfirm])
 
   return (
     <div className="fixed inset-0 z-10 flex items-center justify-center bg-black/70">

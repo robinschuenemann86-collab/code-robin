@@ -1,4 +1,5 @@
 import { BrowserWindow, screen } from 'electron'
+import { getStore, setSettings } from './store'
 
 // Bewusst ohne eigenes Vite-Renderer-Ziel und ohne Preload: der Inhalt ist so
 // trivial (Name + laufende Uhr + Schließen-Knopf) und komplett selbst
@@ -62,6 +63,23 @@ function overlayHtml(entryName: string, startedAt: number): string {
 </html>`
 }
 
+function getSavedPosition(): { x: number; y: number } | null {
+  const value = getStore().get('settings').overlayPosition
+  if (
+    value &&
+    typeof value === 'object' &&
+    typeof (value as { x?: unknown }).x === 'number' &&
+    typeof (value as { y?: unknown }).y === 'number'
+  ) {
+    return value as { x: number; y: number }
+  }
+  return null
+}
+
+function saveSavedPosition(x: number, y: number): void {
+  setSettings({ ...getStore().get('settings'), overlayPosition: { x, y } })
+}
+
 export function showOverlay(entryName: string, startedAt: number): void {
   if (overlayWindow) {
     overlayWindow.close()
@@ -71,11 +89,17 @@ export function showOverlay(entryName: string, startedAt: number): void {
   const display = screen.getPrimaryDisplay()
   const width = 220
   const height = 56
+  // Merkt sich eine per Drag verschobene Position (siehe 'moved'-Listener
+  // unten) — ohne gespeicherte Position wie bisher unten rechts.
+  const saved = getSavedPosition()
+  const x = saved?.x ?? display.workArea.x + display.workArea.width - width - 20
+  const y = saved?.y ?? display.workArea.y + display.workArea.height - height - 20
+
   overlayWindow = new BrowserWindow({
     width,
     height,
-    x: display.workArea.x + display.workArea.width - width - 20,
-    y: display.workArea.y + display.workArea.height - height - 20,
+    x,
+    y,
     frame: false,
     resizable: false,
     movable: true,
@@ -88,6 +112,11 @@ export function showOverlay(entryName: string, startedAt: number): void {
   })
   overlayWindow.setAlwaysOnTop(true, 'screen-saver')
   overlayWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(overlayHtml(entryName, startedAt))}`)
+
+  overlayWindow.on('moved', () => {
+    const bounds = overlayWindow?.getBounds()
+    if (bounds) saveSavedPosition(bounds.x, bounds.y)
+  })
 
   overlayWindow.on('closed', () => {
     overlayWindow = null

@@ -3,7 +3,12 @@ import type { Entry, EntryStats, OverviewData, WrappedData } from '../types'
 import { EntryIcon } from './EntryIcon'
 import { IconEdit, IconX } from './icons'
 import { useEscapeToClose } from '../hooks'
-import { ACHIEVEMENTS, unlockedAchievements, type AchievementContext } from '../achievements'
+import {
+  ACHIEVEMENTS,
+  distinctPlatformCount,
+  unlockedAchievements,
+  type AchievementContext
+} from '../achievements'
 import { WrappedDialog } from './WrappedDialog'
 
 interface OverviewDialogProps {
@@ -78,16 +83,17 @@ export function OverviewDialog({
     return entries.find((e) => e.id === top.entryId) ?? null
   }, [stats, entries])
 
-  const unlockedIds = useMemo(() => {
+  const { context: achievementContext, unlocked: unlockedIds } = useMemo(() => {
     const context: AchievementContext = {
       entryCount: entries.length,
       totalPlayedMs: stats.reduce((sum, s) => sum + s.totalPlayedMs, 0),
       totalLaunches: overview.totalLaunches,
       streakDays: overview.streakDays,
       favoriteCount: entries.filter((e) => e.favorite).length,
-      tagCount: new Set(entries.flatMap((e) => e.tags)).size
+      tagCount: new Set(entries.flatMap((e) => e.tags)).size,
+      distinctPlatformCount: distinctPlatformCount(entries)
     }
-    return new Set(unlockedAchievements(context).map((a) => a.id))
+    return { context, unlocked: new Set(unlockedAchievements(context).map((a) => a.id)) }
   }, [entries, stats, overview])
 
   const recent = overview.recentSessions
@@ -350,6 +356,7 @@ export function OverviewDialog({
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-5">
             {ACHIEVEMENTS.map((achievement) => {
               const unlocked = unlockedIds.has(achievement.id)
+              const progress = !unlocked ? achievement.progress?.(achievementContext) : undefined
               return (
                 <div
                   key={achievement.id}
@@ -360,9 +367,24 @@ export function OverviewDialog({
                       : 'border-border opacity-40 grayscale'
                   }`}
                 >
-                  <span className="text-xl">🏆</span>
+                  <span className="text-xl">{achievement.emoji}</span>
                   <span className="text-xs font-bold">{achievement.name}</span>
                   <span className="text-[10px] text-text-muted">{achievement.description}</span>
+                  {progress && (
+                    <div className="mt-1 flex w-full flex-col gap-0.5">
+                      <span className="h-1 w-full overflow-hidden rounded-full bg-panel-active">
+                        <span
+                          className="ember-grad-bg block h-full rounded-full"
+                          style={{
+                            width: `${Math.min(100, (progress.current / progress.target) * 100)}%`
+                          }}
+                        />
+                      </span>
+                      <span className="text-[9px] text-text-muted">
+                        {Math.min(progress.current, progress.target)}/{progress.target}
+                      </span>
+                    </div>
+                  )}
                 </div>
               )
             })}

@@ -14,7 +14,8 @@ const FIRST_STEPS: string[] = [
   'Fehlt ein Cover-Bild, hilft "Fehlende Cover-Art nachladen" im "…"-Menü oder der Hinweis oben im Fenster.',
   '"Übersicht" und "Statistik" zeigen Spielzeit, Streak und ein optionales Wochenziel.',
   'Der Knopf mit den vier Ecken schaltet in den Big-Picture-Modus — auch per Gamepad steuerbar.',
-  'Über das "…"-Menü lässt sich der komplette Datenbestand sichern und wiederherstellen.'
+  'Über das "…"-Menü lässt sich der komplette Datenbestand sichern und wiederherstellen.',
+  'Der Würfel-Knopf wählt zufällig ein Programm — mit Umschalt+Klick nur unter deinen Favoriten.'
 ]
 
 const SHORTCUTS: Array<{ keys: string; description: string }> = [
@@ -22,7 +23,9 @@ const SHORTCUTS: Array<{ keys: string; description: string }> = [
   { keys: 'Pos1 / Ende', description: 'Erstes / letztes Programm der Ansicht auswählen' },
   { keys: 'Enter', description: 'Ausgewähltes Programm starten' },
   { keys: 'Entf / Rücktaste', description: 'Ausgewähltes Programm entfernen' },
-  { keys: 'F', description: 'Favorit umschalten' }
+  { keys: 'F', description: 'Favorit umschalten' },
+  { keys: '/', description: 'Suchfeld fokussieren' },
+  { keys: 'Escape', description: 'Suchfeld leeren, Kontextmenü oder Auswahl schließen' }
 ]
 
 export function HelpDialog({ onClose }: HelpDialogProps): ReactElement {

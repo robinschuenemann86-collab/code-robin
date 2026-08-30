@@ -1,4 +1,4 @@
-import { useState, type ReactElement } from 'react'
+import { useState, type ReactElement, type RefObject } from 'react'
 import type { Entry, SavedView, SortMode, Tag, TagFilterMode, ViewMode } from '../types'
 import { TAG_COLORS } from '../constants'
 import {
@@ -26,6 +26,8 @@ interface SidebarProps {
   onTagFilterModeChange: (mode: TagFilterMode) => void
   searchQuery: string
   onSearchChange: (value: string) => void
+  searchInputRef: RefObject<HTMLInputElement | null>
+  resultCount: number
   viewMode: ViewMode
   onViewModeChange: (mode: ViewMode) => void
   favoritesOnly: boolean
@@ -68,6 +70,8 @@ export function Sidebar({
   onTagFilterModeChange,
   searchQuery,
   onSearchChange,
+  searchInputRef,
+  resultCount,
   viewMode,
   onViewModeChange,
   favoritesOnly,
@@ -123,11 +127,31 @@ export function Sidebar({
       <div className="relative">
         <IconSearch className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted" />
         <input
+          ref={searchInputRef}
           value={searchQuery}
           onChange={(e) => onSearchChange(e.target.value)}
-          placeholder="Suchen …"
-          className="w-full rounded-lg border border-border bg-panel py-1.5 pl-9 pr-3 text-sm text-text outline-none placeholder:text-text-muted focus:border-gold/50"
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') {
+              onSearchChange('')
+              e.currentTarget.blur()
+            }
+          }}
+          placeholder={
+            favoritesOnly
+              ? 'In Favoriten suchen …'
+              : unsortedOnly
+                ? 'In Unsortiert suchen …'
+                : selectedTagIds.size > 0
+                  ? 'In diesem Filter suchen …'
+                  : 'Suchen …'
+          }
+          className="w-full rounded-lg border border-border bg-panel py-1.5 pl-9 pr-16 text-sm text-text outline-none placeholder:text-text-muted focus:border-gold/50"
         />
+        {searchQuery.trim() && (
+          <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-text-muted">
+            {resultCount} Treffer
+          </span>
+        )}
       </div>
 
       <div className="flex gap-1 rounded-lg border border-border bg-panel p-1">
@@ -365,18 +389,25 @@ export function Sidebar({
           })}
 
           {addingTag ? (
-            <input
-              autoFocus
-              value={newTagName}
-              onChange={(e) => setNewTagName(e.target.value)}
-              onBlur={commitNewTag}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') commitNewTag()
-                if (e.key === 'Escape') setAddingTag(false)
-              }}
-              placeholder="Neuer Tag"
-              className="w-28 rounded-full border border-border bg-panel px-3 py-1.5 text-xs text-text outline-none focus:border-gold/50"
-            />
+            <div className="relative">
+              <span
+                className="pointer-events-none absolute left-2.5 top-1/2 h-2 w-2 -translate-y-1/2 rounded-full"
+                style={{ backgroundColor: COLOR_PREVIEW[TAG_COLORS[tags.length % TAG_COLORS.length]] }}
+                title="Farbe, die dieser Tag automatisch bekommt"
+              />
+              <input
+                autoFocus
+                value={newTagName}
+                onChange={(e) => setNewTagName(e.target.value)}
+                onBlur={commitNewTag}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') commitNewTag()
+                  if (e.key === 'Escape') setAddingTag(false)
+                }}
+                placeholder="Neuer Tag"
+                className="w-28 rounded-full border border-border bg-panel py-1.5 pl-6 pr-3 text-xs text-text outline-none focus:border-gold/50"
+              />
+            </div>
           ) : (
             <button
               onClick={() => setAddingTag(true)}

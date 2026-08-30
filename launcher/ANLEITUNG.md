@@ -59,7 +59,9 @@ controller- und TV-taugliche Ansicht – auch per Gamepad steuerbar.
 ## Tastenkürzel
 
 Pfeiltasten zum Navigieren, Enter zum Starten, Entf zum Entfernen, F zum
-Favorisieren. Die vollständige Liste zeigt der "?"-Knopf oben rechts.
+Favorisieren, "/" springt ins Suchfeld. Die vollständige Liste zeigt der
+"?"-Knopf oben rechts. Umschalt+Klick auf den Würfel-Knopf lost nur unter
+deinen Favoriten.
 
 ## Sichern & Wiederherstellen
 
