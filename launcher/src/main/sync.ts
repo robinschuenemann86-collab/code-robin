@@ -77,24 +77,37 @@ function applyPayload(remote: SyncPayload): { entries: Entry[]; tags: Tag[] } {
     tagIdByName.set(key, newTag.id)
   }
 
+  const localEntries = getStore().get('entries')
+
+  // Ohne Plattform-Kennung (Steam/Epic/Battle.net/Ubisoft) ist der Name der
+  // einzige Anhaltspunkt — teilen sich lokal mehrere Einträge denselben
+  // Namen, ist nicht eindeutig, wem entfernte Daten gehören. Für solche
+  // mehrdeutigen Schlüssel lieber gar nicht mergen, statt sie versehentlich
+  // dem falschen Programm zuzuordnen.
+  const localKeyCounts = new Map<string, number>()
+  for (const entry of localEntries) {
+    const key = matchKeyFor(entry)
+    localKeyCounts.set(key, (localKeyCounts.get(key) ?? 0) + 1)
+  }
+
   const remoteByMatchKey = new Map(remote.entries.map((e) => [e.matchKey, e]))
-  const entries = getStore()
-    .get('entries')
-    .map((entry) => {
-      const remoteEntry = remoteByMatchKey.get(matchKeyFor(entry))
-      if (!remoteEntry) return entry
+  const entries = localEntries.map((entry) => {
+    const key = matchKeyFor(entry)
+    if ((localKeyCounts.get(key) ?? 0) > 1) return entry
+    const remoteEntry = remoteByMatchKey.get(key)
+    if (!remoteEntry) return entry
 
-      const remoteTagIds = remoteEntry.tagNames
-        .map((name) => tagIdByName.get(name.toLowerCase()))
-        .filter((id): id is string => !!id)
+    const remoteTagIds = remoteEntry.tagNames
+      .map((name) => tagIdByName.get(name.toLowerCase()))
+      .filter((id): id is string => !!id)
 
-      return {
-        ...entry,
-        favorite: entry.favorite || remoteEntry.favorite,
-        rating: Math.max(entry.rating, remoteEntry.rating),
-        tags: [...new Set([...entry.tags, ...remoteTagIds])]
-      }
-    })
+    return {
+      ...entry,
+      favorite: entry.favorite || remoteEntry.favorite,
+      rating: Math.max(entry.rating, remoteEntry.rating),
+      tags: [...new Set([...entry.tags, ...remoteTagIds])]
+    }
+  })
 
   return { entries, tags }
 }

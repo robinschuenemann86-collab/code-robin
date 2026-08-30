@@ -38,6 +38,9 @@ export interface SavedView {
   sortMode: SortMode
   searchQuery: string
   favoritesOnly: boolean
+  missingOnly: boolean
+  missingCoverOnly: boolean
+  recentOnly: boolean
 }
 
 export interface Candidate {
@@ -92,7 +95,7 @@ export interface WrappedData {
   year: number
   totalPlayedMs: number
   topGame: { entryId: string; totalPlayedMs: number } | null
-  wildestDay: { date: string; totalPlayedMs: number } | null
+  wildestDay: { date: number; totalPlayedMs: number } | null
   longestSession: { entryId: string; durationMs: number } | null
   gamesAdded: number
   totalLaunches: number

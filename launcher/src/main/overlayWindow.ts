@@ -123,13 +123,18 @@ export function showOverlay(entryName: string, startedAt: number): void {
   overlayWindow.setAlwaysOnTop(true, 'screen-saver')
   overlayWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(overlayHtml(entryName, startedAt))}`)
 
-  overlayWindow.on('moved', () => {
-    const bounds = overlayWindow?.getBounds()
-    if (bounds) saveSavedPosition(bounds.x, bounds.y)
+  // Auf die konkrete Fenster-Instanz aus diesem Aufruf greifen (nicht auf die
+  // Modulvariable) — sonst könnte das verzögerte 'closed'-Event eines alten
+  // Fensters die Referenz auf ein inzwischen neu erstelltes Fenster löschen,
+  // falls z. B. kurz hintereinander zwei Programme gestartet werden.
+  const thisWindow = overlayWindow
+  thisWindow.on('moved', () => {
+    const bounds = thisWindow.getBounds()
+    saveSavedPosition(bounds.x, bounds.y)
   })
 
-  overlayWindow.on('closed', () => {
-    overlayWindow = null
+  thisWindow.on('closed', () => {
+    if (overlayWindow === thisWindow) overlayWindow = null
   })
 }
 

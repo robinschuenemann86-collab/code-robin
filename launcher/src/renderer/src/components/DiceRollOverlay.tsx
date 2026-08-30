@@ -19,10 +19,14 @@ export function DiceRollOverlay({ entries, onDone }: DiceRollOverlayProps): Reac
   const [current, setCurrent] = useState(() => randomOf(entries))
   const finalRef = useRef(randomOf(entries))
   const finishedRef = useRef(false)
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   function finish(): void {
     if (finishedRef.current) return
     finishedRef.current = true
+    // Sonst rattert das Intervall nach einem Klick zum Überspringen im
+    // Hintergrund weiter (weitere Ticks/Sounds), bis es von selbst fertig wäre.
+    if (intervalRef.current) clearInterval(intervalRef.current)
     setCurrent(finalRef.current)
     playSuccessSound()
     setTimeout(() => onDone(finalRef.current), 300)
@@ -30,17 +34,18 @@ export function DiceRollOverlay({ entries, onDone }: DiceRollOverlayProps): Reac
 
   useEffect(() => {
     let tick = 0
-    const interval = setInterval(() => {
+    intervalRef.current = setInterval(() => {
       tick += 1
       playDiceTick()
       if (tick >= TICKS) {
-        clearInterval(interval)
         finish()
         return
       }
       setCurrent(randomOf(entries))
     }, TICK_MS)
-    return () => clearInterval(interval)
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current)
+    }
     // Läuft absichtlich nur einmal beim Erscheinen — entries würde bei jedem
     // Render einen neuen Wurf anstoßen.
     // eslint-disable-next-line react-hooks/exhaustive-deps

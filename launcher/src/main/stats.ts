@@ -219,7 +219,10 @@ export interface WrappedData {
   year: number
   totalPlayedMs: number
   topGame: { entryId: string; totalPlayedMs: number } | null
-  wildestDay: { date: string; totalPlayedMs: number } | null
+  // Lokaler Mitternachts-Zeitstempel (siehe startOfDay), kein ISO-Datum —
+  // sonst würde die Auswertung bei Nutzern außerhalb UTC den falschen
+  // Kalendertag treffen, wenn eine Sitzung nah an Mitternacht startet.
+  wildestDay: { date: number; totalPlayedMs: number } | null
   longestSession: { entryId: string; durationMs: number } | null
   gamesAdded: number
   totalLaunches: number
@@ -240,7 +243,7 @@ export function getWrapped(): WrappedData {
 
   let totalPlayedMs = 0
   const byEntry = new Map<string, number>()
-  const byDay = new Map<string, number>()
+  const byDay = new Map<number, number>()
   let longestSession: WrappedData['longestSession'] = null
 
   for (const session of sessions) {
@@ -248,7 +251,7 @@ export function getWrapped(): WrappedData {
     totalPlayedMs += duration
     byEntry.set(session.entryId, (byEntry.get(session.entryId) ?? 0) + duration)
 
-    const dayKey = new Date(session.startedAt).toISOString().slice(0, 10)
+    const dayKey = startOfDay(session.startedAt)
     byDay.set(dayKey, (byDay.get(dayKey) ?? 0) + duration)
 
     if (!longestSession || duration > longestSession.durationMs) {

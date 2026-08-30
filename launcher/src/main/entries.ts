@@ -76,7 +76,11 @@ async function addEntriesFromPaths(paths: string[]): Promise<Entry[]> {
     existingPaths.add(pathKey(resolvedPath))
   }
 
-  const updated = [...existing, ...newEntries]
+  // Nicht mit der eingangs gelesenen `existing`-Momentaufnahme zusammenführen:
+  // Icon-Extraktion oben braucht Zeit, in der z. B. ein Favorit/Tag/Rename an
+  // einem anderen Eintrag passiert sein kann — der aktuelle Stand wird hier
+  // erst unmittelbar vor dem Schreiben geholt, damit das nicht überschrieben wird.
+  const updated = [...getStore().get('entries'), ...newEntries]
   setEntries(updated)
   return updated
 }

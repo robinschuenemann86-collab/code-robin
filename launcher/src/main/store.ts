@@ -80,7 +80,10 @@ const SavedViewSchema = z.object({
   unsortedOnly: z.boolean().default(false),
   sortMode: z.enum(['name', 'recent', 'playtime', 'added', 'custom', 'rating']),
   searchQuery: z.string(),
-  favoritesOnly: z.boolean()
+  favoritesOnly: z.boolean(),
+  missingOnly: z.boolean().default(false),
+  missingCoverOnly: z.boolean().default(false),
+  recentOnly: z.boolean().default(false)
 })
 
 const StoreDataSchema = z.object({

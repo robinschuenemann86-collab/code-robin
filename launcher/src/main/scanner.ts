@@ -803,7 +803,10 @@ async function importCandidates(candidates: Candidate[]): Promise<Entry[]> {
     })
   }
 
-  const updated = [...entries, ...newEntries]
+  // Frisch lesen statt der eingangs geholten `entries`-Momentaufnahme zu
+  // vertrauen — konsistent mit demselben Muster in entries.ts, auch wenn hier
+  // (anders als dort) keine asynchrone Arbeit in der Schleife läuft.
+  const updated = [...getStore().get('entries'), ...newEntries]
   setEntries(updated)
   return updated
 }

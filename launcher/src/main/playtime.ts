@@ -2,8 +2,8 @@ import { spawn } from 'child_process'
 import { randomUUID } from 'crypto'
 import { Notification } from 'electron'
 import { getStore, setSessionArchive, setSessions, setSettings, type Session } from './store'
-import { clearDiscordPresence } from './discordPresence'
-import { hideOverlay } from './overlayWindow'
+import { clearDiscordPresence, setDiscordPresence } from './discordPresence'
+import { hideOverlay, showOverlay } from './overlayWindow'
 import { setTrayRunningEntry } from './tray'
 
 const POLL_INTERVAL_MS = 15_000
@@ -175,13 +175,24 @@ async function pollTick(): Promise<void> {
 
   if (changed) {
     setSessions(updated)
-    // Sobald keine Sitzung mehr offen ist, läuft (soweit MR Launch weiß)
-    // gerade kein getracktes Spiel mehr — "Spielt gerade X" soll dann wieder
-    // verschwinden statt das zuletzt beendete Spiel weiter anzuzeigen.
-    if (!updated.some((s) => s.endedAt === null)) {
+    const stillOpen = updated.filter((s) => s.endedAt === null)
+    if (stillOpen.length === 0) {
+      // Keine Sitzung mehr offen — "Spielt gerade X" soll wieder verschwinden
+      // statt das zuletzt beendete Spiel weiter anzuzeigen.
       clearDiscordPresence()
       hideOverlay()
       setTrayRunningEntry(null)
+    } else {
+      // Mindestens eine Sitzung läuft noch weiter (z. B. zwei Programme
+      // gleichzeitig gestartet) — Anzeige auf die zuletzt gestartete davon
+      // umschalten, statt weiter das soeben beendete Programm zu zeigen.
+      const mostRecent = stillOpen.reduce((a, b) => (b.startedAt > a.startedAt ? b : a))
+      const entry = entries.find((e) => e.id === mostRecent.entryId)
+      if (entry) {
+        setDiscordPresence(entry.name)
+        showOverlay(entry.name, mostRecent.startedAt)
+        setTrayRunningEntry(entry.name)
+      }
     }
   }
 }

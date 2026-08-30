@@ -135,12 +135,15 @@ function App(): ReactElement {
     setCoverArtNudgeDismissedState(value)
   }
   const [smartSuggestion, setSmartSuggestion] = useState<SmartSuggestion | null>(null)
-  const [suggestionDismissed, setSuggestionDismissedState] = useState(
-    () => localStorage.getItem('suggestionDismissed') === 'true'
+  // Merkt sich, WELCHER Vorschlag (Tag + Programm) ausgeblendet wurde, statt
+  // eines bloßen Ja/Nein — sonst würde das Ausblenden am Montag den Vorschlag
+  // für alle künftigen Tage/Programme dauerhaft verstecken.
+  const [dismissedSuggestionKey, setDismissedSuggestionKeyState] = useState(() =>
+    localStorage.getItem('dismissedSuggestionKey')
   )
-  function setSuggestionDismissed(value: boolean): void {
-    localStorage.setItem('suggestionDismissed', String(value))
-    setSuggestionDismissedState(value)
+  function dismissSuggestion(key: string): void {
+    localStorage.setItem('dismissedSuggestionKey', key)
+    setDismissedSuggestionKeyState(key)
   }
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [lastClickedIndex, setLastClickedIndex] = useState<number | null>(null)
@@ -214,13 +217,24 @@ function App(): ReactElement {
     return window.api.onEntriesChanged(setEntries)
   }, [])
 
-  // Prüft erneut, sobald sich die Liste ändert (z. B. nach einer
+  // Nur die id+Pfad-Kombinationen als Abhängigkeit nehmen, nicht `entries`
+  // direkt — sonst würde jede Kleinigkeit (Favorit, Bewertung, Umbenennen,
+  // Umsortieren) eine komplette, synchrone Datei-Existenzprüfung über die
+  // ganze Bibliothek im Main-Prozess auslösen, obwohl sich an den Pfaden
+  // gar nichts geändert hat.
+  const entryPathsKey = useMemo(
+    () => entries.map((e) => `${e.id}:${e.path}`).join('|'),
+    [entries]
+  )
+
+  // Prüft erneut, sobald sich Einträge oder Pfade ändern (z. B. nach einer
   // Wiederherstellung auf diesem Rechner oder wenn ein Spiel deinstalliert wurde).
   useEffect(() => {
     window.api.checkEntryPaths().then((result) => {
       setMissingPaths(new Set(Object.keys(result).filter((id) => !result[id])))
     })
-  }, [entries])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [entryPathsKey])
 
   // Spielzeit läuft im Hintergrund weiter (Prozess-Polling im Main-Prozess),
   // daher hier frisch nachladen statt die Werte vom App-Start zu behalten. Der
@@ -250,6 +264,7 @@ function App(): ReactElement {
   // Durchlauf säht den "schon gesehen"-Stand nur still ein, statt jemandem mit
   // vorhandener Bibliothek gleich eine ganze Salve an Meldungen zu zeigen.
   const seenAchievementsRef = useRef<Set<string> | null>(null)
+  const isFirstAchievementPassRef = useRef(true)
   useEffect(() => {
     if (seenAchievementsRef.current === null) {
       seenAchievementsRef.current = loadSeenAchievementIds()
@@ -266,10 +281,20 @@ function App(): ReactElement {
     const unlocked = unlockedAchievements(context)
     const seen = seenAchievementsRef.current
     const freshlyUnlocked = unlocked.filter((a) => !seen.has(a.id))
+    // Läuft z. B. beim Start mehrfach mit noch leeren Listen durch, bevor die
+    // echten Daten geladen sind — solche leeren Durchgänge sollen den
+    // "erster echter Durchlauf"-Zustand unten nicht schon verbrauchen.
     if (freshlyUnlocked.length === 0) return
 
     unlocked.forEach((a) => seen.add(a.id))
     saveSeenAchievementIds(seen)
+
+    // Der erste Durchlauf, der wirklich etwas Neues findet (z. B. direkt nach
+    // dem Laden einer bereits gefüllten Bibliothek), säht nur still, statt
+    // gleich eine ganze Salve an Meldungen/Konfetti zu zeigen.
+    const isFirstMeaningfulPass = isFirstAchievementPassRef.current
+    isFirstAchievementPassRef.current = false
+    if (isFirstMeaningfulPass) return
 
     const [first, ...rest] = freshlyUnlocked
     setStatus(
@@ -357,18 +382,41 @@ function App(): ReactElement {
   const suggestedEntry = smartSuggestion
     ? (entries.find((e) => e.id === smartSuggestion.entryId) ?? null)
     : null
+  const suggestionKey = smartSuggestion
+    ? `${new Date().toDateString()}:${smartSuggestion.entryId}`
+    : null
+  const suggestionDismissed = suggestionKey !== null && suggestionKey === dismissedSuggestionKey
 
   // Nur im ungefilterten Grundzustand zeigen — sonst wirkt es wie eine zweite,
   // widersprüchliche Liste neben den gerade gefilterten Ergebnissen.
   const recentlyPlayed = useMemo(() => {
-    if (searchQuery.trim() || selectedTagIds.size > 0 || unsortedOnly || favoritesOnly) return []
+    if (
+      searchQuery.trim() ||
+      selectedTagIds.size > 0 ||
+      unsortedOnly ||
+      favoritesOnly ||
+      missingOnly ||
+      missingCoverOnly ||
+      recentOnly
+    )
+      return []
     return stats
       .filter((s) => s.lastPlayedAt !== null)
       .sort((a, b) => (b.lastPlayedAt ?? 0) - (a.lastPlayedAt ?? 0))
       .slice(0, 6)
       .map((s) => entries.find((e) => e.id === s.entryId))
       .filter((e): e is Entry => e !== undefined)
-  }, [stats, entries, searchQuery, selectedTagIds, unsortedOnly, favoritesOnly])
+  }, [
+    stats,
+    entries,
+    searchQuery,
+    selectedTagIds,
+    unsortedOnly,
+    favoritesOnly,
+    missingOnly,
+    missingCoverOnly,
+    recentOnly
+  ])
 
   async function handleAdd(): Promise<void> {
     const updated = await window.api.addEntryViaDialog()
@@ -631,7 +679,10 @@ function App(): ReactElement {
         unsortedOnly,
         sortMode,
         searchQuery,
-        favoritesOnly
+        favoritesOnly,
+        missingOnly,
+        missingCoverOnly,
+        recentOnly
       })
     )
   }
@@ -643,6 +694,9 @@ function App(): ReactElement {
     setSortMode(view.sortMode)
     setSearchQuery(view.searchQuery)
     setFavoritesOnly(view.favoritesOnly)
+    setMissingOnly(view.missingOnly)
+    setMissingCoverOnly(view.missingCoverOnly)
+    setRecentOnly(view.recentOnly)
   }
 
   async function handleRemoveView(id: string): Promise<void> {
@@ -893,7 +947,7 @@ function App(): ReactElement {
               Starten
             </button>
             <button
-              onClick={() => setSuggestionDismissed(true)}
+              onClick={() => suggestionKey && dismissSuggestion(suggestionKey)}
               title="Ausblenden"
               className="text-text-muted hover:text-gold"
             >
