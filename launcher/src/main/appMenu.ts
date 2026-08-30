@@ -1,6 +1,7 @@
 import { app, ipcMain, Menu, type BrowserWindow } from 'electron'
 import { exportBackup, importBackup } from './backup'
 import { fetchMissingCoverArtForAll } from './coverArt'
+import { isOverlayEnabled, setOverlayEnabled } from './overlayWindow'
 
 export function registerAppMenuHandlers(getWindow: () => BrowserWindow | null): void {
   ipcMain.on('appMenu:show', () => {
@@ -36,6 +37,13 @@ export function registerAppMenuHandlers(getWindow: () => BrowserWindow | null): 
       {
         label: 'PC-Abgleich…',
         click: () => window.webContents.send('sync:openDialog')
+      },
+      { type: 'separator' },
+      {
+        label: 'Spielzeit-Overlay anzeigen',
+        type: 'checkbox',
+        checked: isOverlayEnabled(),
+        click: (menuItem) => setOverlayEnabled(menuItem.checked)
       }
     ])
     menu.popup({ window })

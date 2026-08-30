@@ -95,6 +95,8 @@ const api = {
   hasCoverArtProxy: (): Promise<boolean> => ipcRenderer.invoke('coverArt:hasProxy'),
   fetchCoverArt: (id: string): Promise<Entry[]> => ipcRenderer.invoke('coverArt:fetch', id),
   fetchAllMissingCoverArt: (): Promise<void> => ipcRenderer.invoke('coverArt:fetchAllMissing'),
+  fetchCoverArtForSelected: (ids: string[]): Promise<void> =>
+    ipcRenderer.invoke('coverArt:fetchForSelected', ids),
   onOpenCoverArtKeyDialog: (callback: () => void): (() => void) => {
     const listener = (): void => callback()
     ipcRenderer.on('coverArt:openKeyDialog', listener)

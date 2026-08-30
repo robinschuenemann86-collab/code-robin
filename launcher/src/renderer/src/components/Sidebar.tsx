@@ -37,6 +37,12 @@ interface SidebarProps {
   missingCount: number
   missingOnly: boolean
   onMissingOnlyChange: (value: boolean) => void
+  missingCoverCount: number
+  missingCoverOnly: boolean
+  onMissingCoverOnlyChange: (value: boolean) => void
+  recentCount: number
+  recentOnly: boolean
+  onRecentOnlyChange: (value: boolean) => void
   sortMode: SortMode
   onSortModeChange: (mode: SortMode) => void
   onAddTag: (name: string) => void
@@ -81,6 +87,12 @@ export function Sidebar({
   missingCount,
   missingOnly,
   onMissingOnlyChange,
+  missingCoverCount,
+  missingCoverOnly,
+  onMissingCoverOnlyChange,
+  recentCount,
+  recentOnly,
+  onRecentOnlyChange,
   sortMode,
   onSortModeChange,
   onAddTag,
@@ -262,6 +274,30 @@ export function Sidebar({
           >
             <IconAlertTriangle className="h-3.5 w-3.5 shrink-0" />
             Fehlende Pfade <span className="text-text-muted">({missingCount})</span>
+          </button>
+        )}
+        {missingCoverCount > 0 && (
+          <button
+            onClick={() => onMissingCoverOnlyChange(!missingCoverOnly)}
+            className={`rounded-lg px-2 py-1.5 text-left text-sm transition ${
+              missingCoverOnly
+                ? 'bg-panel-active text-text'
+                : 'text-text-muted hover:bg-panel-hover hover:text-text'
+            }`}
+          >
+            Ohne Cover <span className="text-text-muted">({missingCoverCount})</span>
+          </button>
+        )}
+        {recentCount > 0 && (
+          <button
+            onClick={() => onRecentOnlyChange(!recentOnly)}
+            className={`rounded-lg px-2 py-1.5 text-left text-sm transition ${
+              recentOnly
+                ? 'bg-panel-active text-text'
+                : 'text-text-muted hover:bg-panel-hover hover:text-text'
+            }`}
+          >
+            Kürzlich hinzugefügt <span className="text-text-muted">({recentCount})</span>
           </button>
         )}
       </div>

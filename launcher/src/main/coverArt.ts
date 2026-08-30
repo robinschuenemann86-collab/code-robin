@@ -266,6 +266,28 @@ export async function fetchCoverArtForNewEntries(
   }
 }
 
+// Gemeinsamer Kern für "alle fehlenden nachladen" und "für Auswahl laden" —
+// beide unterscheiden sich nur darin, welche ids sie übergeben.
+async function fetchCoverArtForIdsWithStatus(window: BrowserWindow, ids: string[]): Promise<void> {
+  window.webContents.send('status:message', `Suche Cover-Art für ${ids.length} Programme …`)
+  const beforeHashes = new Map(
+    getStore()
+      .get('entries')
+      .filter((entry) => ids.includes(entry.id))
+      .map((entry) => [entry.id, entry.coverHash])
+  )
+
+  await fetchCoverArtForNewEntries(ids, (entries) =>
+    window.webContents.send('entries:changed', entries)
+  )
+
+  const found = getStore()
+    .get('entries')
+    .filter((entry) => beforeHashes.has(entry.id) && entry.coverHash !== beforeHashes.get(entry.id))
+    .length
+  window.webContents.send('status:message', `Cover-Art für ${found} von ${ids.length} Programmen gefunden.`)
+}
+
 // Für Bibliotheken, die schon vor der automatischen Cover-Art existierten —
 // holt sie rückwirkend für alle Einträge nach, die noch keine haben, statt
 // dass man jedes einzeln über das Kontextmenü anstoßen muss.
@@ -278,30 +300,31 @@ export async function fetchMissingCoverArtForAll(window: BrowserWindow): Promise
     return
   }
 
-  const missing = getStore()
+  const missingIds = getStore()
     .get('entries')
     .filter((entry) => !entry.coverHash)
-  if (missing.length === 0) {
+    .map((entry) => entry.id)
+  if (missingIds.length === 0) {
     window.webContents.send('status:message', 'Alle Programme haben bereits Cover-Art.')
     return
   }
 
-  window.webContents.send('status:message', `Suche Cover-Art für ${missing.length} Programme …`)
-  const beforeHashes = new Map(missing.map((entry) => [entry.id, entry.coverHash]))
+  await fetchCoverArtForIdsWithStatus(window, missingIds)
+}
 
-  await fetchCoverArtForNewEntries(
-    missing.map((entry) => entry.id),
-    (entries) => window.webContents.send('entries:changed', entries)
-  )
+// Analog, aber gezielt für eine per Mehrfachauswahl übergebene Liste, statt
+// immer gleich die ganze Bibliothek nach fehlenden Covern zu durchsuchen.
+export async function fetchCoverArtForSelected(window: BrowserWindow, ids: string[]): Promise<void> {
+  if (!canFetchCoverArt()) {
+    window.webContents.send(
+      'status:message',
+      'Kein SteamGridDB-Key hinterlegt. Über "…" → "SteamGridDB-Key…" eintragen.'
+    )
+    return
+  }
+  if (ids.length === 0) return
 
-  const found = getStore()
-    .get('entries')
-    .filter((entry) => beforeHashes.has(entry.id) && entry.coverHash !== beforeHashes.get(entry.id))
-    .length
-  window.webContents.send(
-    'status:message',
-    `Cover-Art für ${found} von ${missing.length} Programmen gefunden.`
-  )
+  await fetchCoverArtForIdsWithStatus(window, ids)
 }
 
 export function registerCoverArtHandlers(getWindow: () => BrowserWindow | null): void {
@@ -317,5 +340,10 @@ export function registerCoverArtHandlers(getWindow: () => BrowserWindow | null):
     const window = getWindow()
     if (!window) return
     await fetchMissingCoverArtForAll(window)
+  })
+  ipcMain.handle('coverArt:fetchForSelected', async (_event, ids: string[]) => {
+    const window = getWindow()
+    if (!window) return
+    await fetchCoverArtForSelected(window, ids)
   })
 }

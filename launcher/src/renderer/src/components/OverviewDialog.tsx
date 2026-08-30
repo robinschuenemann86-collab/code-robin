@@ -158,6 +158,15 @@ export function OverviewDialog({
                   ? 'Diese Woche noch nichts gestartet.'
                   : `An ${daysActive} von 7 Tagen war was los.`}
               </p>
+              {(overview.playedThisWeekMs > 0 || overview.playedLastWeekMs > 0) && (
+                <p className="text-xs text-text-muted">
+                  {Math.abs(overview.playedThisWeekMs - overview.playedLastWeekMs) < 60_000
+                    ? 'Genau wie letzte Woche.'
+                    : `${overview.playedThisWeekMs >= overview.playedLastWeekMs ? '+' : '-'}${formatDuration(
+                        Math.abs(overview.playedThisWeekMs - overview.playedLastWeekMs)
+                      )} ggü. letzter Woche`}
+                </p>
+              )}
 
               {editingGoal ? (
                 <div className="flex items-center gap-1.5">

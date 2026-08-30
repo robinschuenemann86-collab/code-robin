@@ -4,6 +4,7 @@ import { Notification } from 'electron'
 import { getStore, setSessionArchive, setSessions, setSettings, type Session } from './store'
 import { clearDiscordPresence } from './discordPresence'
 import { hideOverlay } from './overlayWindow'
+import { setTrayRunningEntry } from './tray'
 
 const POLL_INTERVAL_MS = 15_000
 const MISSES_BEFORE_END = 2 // ~30s Abwesenheit, bevor eine Sitzung als beendet gilt
@@ -180,6 +181,7 @@ async function pollTick(): Promise<void> {
     if (!updated.some((s) => s.endedAt === null)) {
       clearDiscordPresence()
       hideOverlay()
+      setTrayRunningEntry(null)
     }
   }
 }

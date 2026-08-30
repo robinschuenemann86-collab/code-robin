@@ -158,21 +158,31 @@ export function DetailPanel({
       )}
 
       <div className="flex flex-col items-center gap-3">
-        <button
-          onClick={() => onChangeIcon(entry.id)}
-          title="Icon ändern"
+        <div
           className="group relative rounded-xl"
           style={accentColor ? { boxShadow: `0 0 24px 2px ${accentColor}55` } : undefined}
         >
-          <EntryIcon
-            iconHash={entry.iconHash}
-            coverHash={entry.coverHash}
-            className={entry.coverHash ? 'aspect-[2/3] w-32' : 'h-20 w-20'}
-          />
-          <span className="absolute inset-0 hidden items-center justify-center rounded-xl bg-black/50 group-hover:flex">
-            <IconEdit className="h-5 w-5 text-white" />
-          </span>
-        </button>
+          <button
+            onClick={() => {
+              const hash = entry.coverHash ?? entry.iconHash
+              if (hash) setLightboxHash(hash)
+            }}
+            title="Vergrößern"
+          >
+            <EntryIcon
+              iconHash={entry.iconHash}
+              coverHash={entry.coverHash}
+              className={entry.coverHash ? 'aspect-[2/3] w-32' : 'h-20 w-20'}
+            />
+          </button>
+          <button
+            onClick={() => onChangeIcon(entry.id)}
+            title="Icon ändern"
+            className="absolute bottom-1 right-1 hidden rounded-md bg-black/60 p-1 text-white group-hover:flex"
+          >
+            <IconEdit className="h-3.5 w-3.5" />
+          </button>
+        </div>
         <button
           onClick={() => onFetchCoverArt(entry.id)}
           className="text-xs font-semibold text-gold hover:brightness-125"

@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactElement } from 'react'
 import type { Entry } from '../types'
 import { EntryIcon } from './EntryIcon'
+import { IconAlertTriangle } from './icons'
 import { extractAccentColor } from '../colorExtraction'
 import logo from '../assets/logo.png'
 
@@ -8,6 +9,7 @@ interface BigPictureViewProps {
   entries: Entry[]
   totalEntryCount: number
   runningIds: Set<string>
+  missingPaths: Set<string>
   onLaunch: (entry: Entry) => void
   onExit: () => void
   onResetFilters: () => void
@@ -19,6 +21,7 @@ export function BigPictureView({
   entries,
   totalEntryCount,
   runningIds,
+  missingPaths,
   onLaunch,
   onExit,
   onResetFilters
@@ -193,6 +196,12 @@ export function BigPictureView({
                     <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
                     Läuft
                   </span>
+                )}
+                {missingPaths.has(entry.id) && (
+                  <IconAlertTriangle
+                    className="absolute right-1.5 top-1.5 h-4 w-4 text-amber"
+                    title="Pfad nicht gefunden"
+                  />
                 )}
               </div>
               <span className="w-full truncate text-sm font-medium">{entry.name}</span>

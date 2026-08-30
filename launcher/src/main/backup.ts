@@ -1,5 +1,7 @@
-import { dialog, type BrowserWindow } from 'electron'
-import { readFile, writeFile } from 'fs/promises'
+import { app, dialog, type BrowserWindow } from 'electron'
+import { existsSync, mkdirSync } from 'fs'
+import { readdir, readFile, unlink, writeFile } from 'fs/promises'
+import { join } from 'path'
 import { getStore, parseStoreData, replaceStoreData, type Entry, type StoreData } from './store'
 import { iconFilePath } from './icons'
 
@@ -20,14 +22,7 @@ function collectReferencedHashes(entries: Entry[]): Set<string> {
   return hashes
 }
 
-export async function exportBackup(window: BrowserWindow): Promise<void> {
-  const result = await dialog.showSaveDialog(window, {
-    title: 'Daten sichern',
-    defaultPath: `mr-launch-backup-${new Date().toISOString().slice(0, 10)}.json`,
-    filters: [{ name: 'JSON', extensions: ['json'] }]
-  })
-  if (result.canceled || !result.filePath) return
-
+async function buildBackupFile(): Promise<BackupFile> {
   const data = getStore().store
   const icons: Record<string, string> = {}
   for (const hash of collectReferencedHashes(data.entries)) {
@@ -37,14 +32,50 @@ export async function exportBackup(window: BrowserWindow): Promise<void> {
       // Datei bereits weg (z. B. manuell gelöscht) — ohne Bild sichern statt abzubrechen.
     }
   }
+  return { data, icons }
+}
 
-  const backup: BackupFile = { data, icons }
-  await writeFile(result.filePath, JSON.stringify(backup), 'utf-8')
+export async function exportBackup(window: BrowserWindow): Promise<void> {
+  const result = await dialog.showSaveDialog(window, {
+    title: 'Daten sichern',
+    defaultPath: `mr-launch-backup-${new Date().toISOString().slice(0, 10)}.json`,
+    filters: [{ name: 'JSON', extensions: ['json'] }]
+  })
+  if (result.canceled || !result.filePath) return
+
+  await writeFile(result.filePath, JSON.stringify(await buildBackupFile()), 'utf-8')
   dialog.showMessageBox(window, {
     type: 'info',
     message: 'Daten wurden gesichert.',
     detail: result.filePath
   })
+}
+
+const AUTO_BACKUP_KEEP = 5
+
+function autoBackupDir(): string {
+  const dir = join(app.getPath('userData'), 'auto-backups')
+  if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
+  return dir
+}
+
+// Läuft still im Hintergrund vor jedem eingespielten Update (siehe
+// updater.ts) — kein Dialog, keine Nutzerinteraktion, nur ein zusätzliches
+// Sicherheitsnetz. Behält nur die letzten AUTO_BACKUP_KEEP Stände, damit sich
+// das nicht unbegrenzt aufsummiert.
+export async function autoBackupBeforeUpdate(): Promise<void> {
+  try {
+    const dir = autoBackupDir()
+    const file = join(dir, `auto-backup-${Date.now()}.json`)
+    await writeFile(file, JSON.stringify(await buildBackupFile()), 'utf-8')
+
+    const files = (await readdir(dir)).filter((name) => name.startsWith('auto-backup-')).sort()
+    const excess = files.slice(0, Math.max(0, files.length - AUTO_BACKUP_KEEP))
+    await Promise.all(excess.map((name) => unlink(join(dir, name)).catch(() => {})))
+  } catch {
+    // Automatisches Backup ist ein Bonus, kein Update-Blocker — ein
+    // fehlgeschlagener Versuch darf das eigentliche Update nicht verhindern.
+  }
 }
 
 // Gibt die neue Eintragsliste zurück, damit der Aufrufer die UI aktualisieren

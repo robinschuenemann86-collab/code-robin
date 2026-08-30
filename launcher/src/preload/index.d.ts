@@ -60,6 +60,7 @@ export interface LauncherApi {
   hasCoverArtProxy: () => Promise<boolean>
   fetchCoverArt: (id: string) => Promise<Entry[]>
   fetchAllMissingCoverArt: () => Promise<void>
+  fetchCoverArtForSelected: (ids: string[]) => Promise<void>
   onOpenCoverArtKeyDialog: (callback: () => void) => () => void
 
   getScreenshots: (id: string) => Promise<string[]>

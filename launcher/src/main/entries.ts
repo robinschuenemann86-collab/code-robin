@@ -9,6 +9,7 @@ import { ensureIconCached, removeCachedIcon, setCustomIcon } from './icons'
 import { startSession } from './playtime'
 import { setDiscordPresence } from './discordPresence'
 import { showOverlay } from './overlayWindow'
+import { setTrayRunningEntry } from './tray'
 import { fetchCoverArtForNewEntries } from './coverArt'
 
 function deriveName(targetPath: string): string {
@@ -308,6 +309,7 @@ export async function launchEntry(id: string): Promise<void> {
   if (entry.expectedProcessName) {
     setDiscordPresence(entry.name)
     showOverlay(entry.name, Date.now())
+    setTrayRunningEntry(entry.name)
   }
 }
 

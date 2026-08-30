@@ -1,6 +1,7 @@
 import { ipcMain, type BrowserWindow } from 'electron'
 import { autoUpdater } from 'electron-updater'
 import { is } from '@electron-toolkit/utils'
+import { autoBackupBeforeUpdate } from './backup'
 
 export type UpdaterStatus =
   | { state: 'checking' }
@@ -29,7 +30,8 @@ export function registerUpdaterHandlers(getWindow: () => BrowserWindow | null): 
     send({ state: 'error', message: error instanceof Error ? error.message : String(error) })
   )
 
-  ipcMain.handle('updater:install', () => {
+  ipcMain.handle('updater:install', async () => {
+    await autoBackupBeforeUpdate()
     autoUpdater.quitAndInstall()
   })
 

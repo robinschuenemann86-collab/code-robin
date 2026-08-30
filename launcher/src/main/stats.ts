@@ -55,6 +55,7 @@ export interface OverviewData {
   // null = liegt noch in der Zukunft dieser Woche, gab's noch nicht.
   weekActivity: (boolean | null)[]
   playedThisWeekMs: number
+  playedLastWeekMs: number
   totalLaunches: number
   recentSessions: { entryId: string; endedAt: number; durationMs: number }[]
   // Selbst gesetztes Wochenziel in Minuten, null wenn keins gesetzt ist.
@@ -112,7 +113,10 @@ function computeOverview(): OverviewData {
     cursor -= DAY_MS
   }
 
+  const lastWeekMonday = thisWeekMonday - 7 * DAY_MS
+
   let playedThisWeekMs = 0
+  let playedLastWeekMs = 0
   // Archivierte Sitzungen zählen weiter zur Gesamtzahl der Starts mit — nur
   // die Einzelsitzungen dahinter sind aus `sessions` verschwunden.
   let totalLaunches = Object.values(getStore().get('sessionArchive')).reduce(
@@ -127,6 +131,8 @@ function computeOverview(): OverviewData {
       const durationMs = session.endedAt - session.startedAt
       if (session.startedAt >= thisWeekMonday) {
         playedThisWeekMs += durationMs
+      } else if (session.startedAt >= lastWeekMonday) {
+        playedLastWeekMs += durationMs
       }
       recentSessions.push({ entryId: session.entryId, endedAt: session.endedAt, durationMs })
     }
@@ -137,6 +143,7 @@ function computeOverview(): OverviewData {
     streakDays,
     weekActivity,
     playedThisWeekMs,
+    playedLastWeekMs,
     totalLaunches,
     recentSessions: recentSessions.slice(0, 6),
     weeklyGoalMinutes: getWeeklyGoalMinutes(),

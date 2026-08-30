@@ -63,6 +63,15 @@ function overlayHtml(entryName: string, startedAt: number): string {
 </html>`
 }
 
+export function isOverlayEnabled(): boolean {
+  return getStore().get('settings').overlayEnabled !== false
+}
+
+export function setOverlayEnabled(enabled: boolean): void {
+  setSettings({ ...getStore().get('settings'), overlayEnabled: enabled })
+  if (!enabled) hideOverlay()
+}
+
 function getSavedPosition(): { x: number; y: number } | null {
   const value = getStore().get('settings').overlayPosition
   if (
@@ -81,6 +90,7 @@ function saveSavedPosition(x: number, y: number): void {
 }
 
 export function showOverlay(entryName: string, startedAt: number): void {
+  if (!isOverlayEnabled()) return
   if (overlayWindow) {
     overlayWindow.close()
     overlayWindow = null

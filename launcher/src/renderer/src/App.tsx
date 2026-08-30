@@ -116,6 +116,8 @@ function App(): ReactElement {
   const [favoritesOnly, setFavoritesOnly] = useState(false)
   const [soundEnabled, setSoundEnabledState] = useState(isSoundEnabled)
   const [missingOnly, setMissingOnly] = useState(false)
+  const [missingCoverOnly, setMissingCoverOnly] = useState(false)
+  const [recentOnly, setRecentOnly] = useState(false)
   const [viewMode, setViewMode] = useState<ViewMode>('grid')
   const [sortMode, setSortMode] = useState<SortMode>('added')
   const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null)
@@ -298,6 +300,8 @@ function App(): ReactElement {
     const filtered = entries.filter((entry) => {
       if (favoritesOnly && !entry.favorite) return false
       if (missingOnly && !missingPaths.has(entry.id)) return false
+      if (missingCoverOnly && entry.coverHash) return false
+      if (recentOnly && !isNewEntry(entry)) return false
       if (unsortedOnly && entry.tags.length > 0) return false
       if (selectedTagIds.size > 0) {
         const matches =
@@ -340,6 +344,8 @@ function App(): ReactElement {
     unsortedOnly,
     favoritesOnly,
     missingOnly,
+    missingCoverOnly,
+    recentOnly,
     missingPaths,
     sortMode,
     stats
@@ -347,6 +353,7 @@ function App(): ReactElement {
 
   const selectedEntry = entries.find((e) => e.id === selectedEntryId) ?? null
   const missingCoverCount = entries.filter((e) => !e.coverHash).length
+  const recentCount = entries.filter(isNewEntry).length
   const suggestedEntry = smartSuggestion
     ? (entries.find((e) => e.id === smartSuggestion.entryId) ?? null)
     : null
@@ -483,6 +490,10 @@ function App(): ReactElement {
 
   async function handleBulkSetFavorite(favorite: boolean): Promise<void> {
     setEntries(await window.api.bulkSetFavorite([...selectedIds], favorite))
+  }
+
+  async function handleBulkFetchCoverArt(): Promise<void> {
+    await window.api.fetchCoverArtForSelected([...selectedIds])
   }
 
   async function handleBulkAddTag(tagId: string): Promise<void> {
@@ -733,6 +744,8 @@ function App(): ReactElement {
     setUnsortedOnly(false)
     setFavoritesOnly(false)
     setMissingOnly(false)
+    setMissingCoverOnly(false)
+    setRecentOnly(false)
   }
 
   if (bigPictureMode) {
@@ -741,6 +754,7 @@ function App(): ReactElement {
         entries={filteredEntries}
         totalEntryCount={entries.length}
         runningIds={runningIds}
+        missingPaths={missingPaths}
         onLaunch={handleLaunch}
         onExit={() => window.api.setFullscreen(false)}
         onResetFilters={resetFilters}
@@ -918,6 +932,12 @@ function App(): ReactElement {
           missingCount={missingPaths.size}
           missingOnly={missingOnly}
           onMissingOnlyChange={setMissingOnly}
+          missingCoverCount={missingCoverCount}
+          missingCoverOnly={missingCoverOnly}
+          onMissingCoverOnlyChange={setMissingCoverOnly}
+          recentCount={recentCount}
+          recentOnly={recentOnly}
+          onRecentOnlyChange={setRecentOnly}
           sortMode={sortMode}
           onSortModeChange={setSortMode}
           onAddTag={handleAddTag}
@@ -1274,6 +1294,12 @@ function App(): ReactElement {
                 ))}
               </select>
             )}
+            <button
+              onClick={handleBulkFetchCoverArt}
+              className="rounded-lg border border-border bg-panel px-3 py-1.5 text-text transition hover:border-gold/50 hover:text-gold"
+            >
+              Cover-Art laden
+            </button>
             <button
               onClick={handleBulkDelete}
               className="rounded-lg border border-border bg-panel px-3 py-1.5 text-text transition hover:border-red-400/50 hover:text-red-400"
