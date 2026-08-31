@@ -43,6 +43,8 @@ interface DetailPanelProps {
   onPickEmulator: (id: string) => void
   onClearEmulatorPath: (id: string) => void
   onFetchMetadata: (id: string) => void
+  onOpenTrailer: (id: string) => void
+  onSetNotes: (id: string, notes: string) => void
 }
 
 function formatDuration(ms: number): string {
@@ -71,13 +73,16 @@ export function DetailPanel({
   onSetLaunchScripts,
   onPickEmulator,
   onClearEmulatorPath,
-  onFetchMetadata
+  onFetchMetadata,
+  onOpenTrailer,
+  onSetNotes
 }: DetailPanelProps): ReactElement {
   const [editingName, setEditingName] = useState(false)
   const [name, setName] = useState(entry.name)
   const [launchArgs, setLaunchArgsValue] = useState(entry.launchArgs ?? '')
   const [preLaunchCommand, setPreLaunchCommand] = useState(entry.preLaunchCommand ?? '')
   const [postLaunchCommand, setPostLaunchCommand] = useState(entry.postLaunchCommand ?? '')
+  const [notes, setNotes] = useState(entry.notes ?? '')
   const [size, setSize] = useState<number | null | 'loading'>('loading')
   const [sessions, setSessions] = useState<Session[]>([])
   const [accentColor, setAccentColor] = useState<string | null>(null)
@@ -159,6 +164,12 @@ export function DetailPanel({
   function commitLaunchArgs(): void {
     if (launchArgs.trim() !== (entry.launchArgs ?? '')) {
       onSetLaunchArgs(entry.id, launchArgs)
+    }
+  }
+
+  function commitNotes(): void {
+    if (notes.trim() !== (entry.notes ?? '')) {
+      onSetNotes(entry.id, notes)
     }
   }
 
@@ -325,6 +336,15 @@ export function DetailPanel({
               .join(' · ') || 'INFO'}
           </span>
           <p className="text-xs leading-relaxed text-text-muted">{entry.description}</p>
+          {entry.videoId && (
+            <button
+              onClick={() => onOpenTrailer(entry.id)}
+              className="flex items-center gap-1.5 self-start text-xs text-gold hover:brightness-125"
+            >
+              <IconPlay className="h-3 w-3" />
+              Trailer ansehen
+            </button>
+          )}
         </div>
       ) : (
         <button
@@ -409,6 +429,23 @@ export function DetailPanel({
           }}
           placeholder="Nach dem Start ausführen …"
           className="w-full rounded-lg border border-border bg-panel px-2 py-1.5 font-mono text-xs text-text outline-none focus:border-gold/50"
+        />
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        <span className="font-display text-[11px] font-bold tracking-wider text-text-muted">
+          NOTIZEN
+        </span>
+        <textarea
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          onBlur={commitNotes}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') setNotes(entry.notes ?? '')
+          }}
+          placeholder="Eigene Notizen …"
+          rows={3}
+          className="w-full resize-none rounded-lg border border-border bg-panel px-2 py-1.5 text-xs text-text outline-none focus:border-gold/50"
         />
       </div>
 

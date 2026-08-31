@@ -4,6 +4,7 @@ import { TAG_COLORS } from '../constants'
 import {
   IconAlertTriangle,
   IconEdit,
+  IconEyeOff,
   IconGrid,
   IconList,
   IconPlus,
@@ -43,6 +44,12 @@ interface SidebarProps {
   recentCount: number
   recentOnly: boolean
   onRecentOnlyChange: (value: boolean) => void
+  neverPlayedCount: number
+  neverPlayedOnly: boolean
+  onNeverPlayedOnlyChange: (value: boolean) => void
+  hiddenCount: number
+  showHidden: boolean
+  onShowHiddenChange: (value: boolean) => void
   sortMode: SortMode
   onSortModeChange: (mode: SortMode) => void
   onAddTag: (name: string) => void
@@ -93,6 +100,12 @@ export function Sidebar({
   recentCount,
   recentOnly,
   onRecentOnlyChange,
+  neverPlayedCount,
+  neverPlayedOnly,
+  onNeverPlayedOnlyChange,
+  hiddenCount,
+  showHidden,
+  onShowHiddenChange,
   sortMode,
   onSortModeChange,
   onAddTag,
@@ -298,6 +311,31 @@ export function Sidebar({
             }`}
           >
             Kürzlich hinzugefügt <span className="text-text-muted">({recentCount})</span>
+          </button>
+        )}
+        {neverPlayedCount > 0 && (
+          <button
+            onClick={() => onNeverPlayedOnlyChange(!neverPlayedOnly)}
+            className={`rounded-lg px-2 py-1.5 text-left text-sm transition ${
+              neverPlayedOnly
+                ? 'bg-panel-active text-text'
+                : 'text-text-muted hover:bg-panel-hover hover:text-text'
+            }`}
+          >
+            Nie gespielt <span className="text-text-muted">({neverPlayedCount})</span>
+          </button>
+        )}
+        {hiddenCount > 0 && (
+          <button
+            onClick={() => onShowHiddenChange(!showHidden)}
+            className={`flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-left text-sm transition ${
+              showHidden
+                ? 'bg-panel-active text-text'
+                : 'text-text-muted hover:bg-panel-hover hover:text-text'
+            }`}
+          >
+            <IconEyeOff className="h-3.5 w-3.5 shrink-0" />
+            Ausgeblendete anzeigen <span className="text-text-muted">({hiddenCount})</span>
           </button>
         )}
       </div>

@@ -16,6 +16,8 @@ export interface LauncherApi {
   launchEntry: (id: string) => Promise<void>
   getEntrySize: (id: string) => Promise<number | null>
   toggleFavorite: (id: string) => Promise<Entry[]>
+  toggleHidden: (id: string) => Promise<Entry[]>
+  setNotes: (id: string, notes: string) => Promise<Entry[]>
   setRating: (id: string, rating: number) => Promise<Entry[]>
   bulkSetFavorite: (ids: string[], favorite: boolean) => Promise<Entry[]>
   bulkAddTag: (ids: string[], tagId: string) => Promise<Entry[]>
@@ -75,6 +77,7 @@ export interface LauncherApi {
   setMetadataCredentials: (clientId: string, clientSecret: string) => Promise<void>
   fetchMetadata: (id: string) => Promise<Entry[]>
   fetchAllMissingMetadata: () => Promise<void>
+  openTrailer: (id: string) => Promise<void>
   onOpenMetadataKeyDialog: (callback: () => void) => () => void
 
   getSteamAchievementsCredentials: () => Promise<{ apiKey: string; steamId: string } | null>

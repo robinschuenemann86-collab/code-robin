@@ -1,6 +1,15 @@
 import { useEffect, useRef, useState, type ReactElement } from 'react'
 import type { Entry, Tag } from '../types'
-import { IconDisc, IconEdit, IconFolder, IconPlay, IconStar, IconTag, IconTrash } from './icons'
+import {
+  IconDisc,
+  IconEdit,
+  IconEyeOff,
+  IconFolder,
+  IconPlay,
+  IconStar,
+  IconTag,
+  IconTrash
+} from './icons'
 
 interface EntryContextMenuProps {
   entry: Entry
@@ -10,6 +19,7 @@ interface EntryContextMenuProps {
   onClose: () => void
   onLaunch: (entry: Entry) => void
   onToggleFavorite: (entry: Entry) => void
+  onToggleHidden: (entry: Entry) => void
   onToggleTag: (id: string, tagId: string) => void
   onShowInExplorer: (id: string) => void
   onChangeIcon: (id: string) => void
@@ -28,6 +38,7 @@ export function EntryContextMenu({
   onClose,
   onLaunch,
   onToggleFavorite,
+  onToggleHidden,
   onToggleTag,
   onShowInExplorer,
   onChangeIcon,
@@ -82,6 +93,10 @@ export function EntryContextMenu({
         <button className={ITEM_CLASS} onClick={() => act(() => onToggleFavorite(entry))}>
           <IconStar className="h-4 w-4" filled={entry.favorite} />
           Favorit
+        </button>
+        <button className={ITEM_CLASS} onClick={() => act(() => onToggleHidden(entry))}>
+          <IconEyeOff className="h-4 w-4 text-text-muted" />
+          {entry.hidden ? 'Einblenden' : 'Ausblenden'}
         </button>
 
         {tags.length > 0 && (

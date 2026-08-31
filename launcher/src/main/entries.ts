@@ -80,7 +80,10 @@ async function addEntriesFromPaths(paths: string[]): Promise<Entry[]> {
       description: null,
       genre: null,
       developer: null,
-      releaseYear: null
+      releaseYear: null,
+      videoId: null,
+      hidden: false,
+      notes: null
     })
     existingPaths.add(pathKey(resolvedPath))
   }
@@ -264,6 +267,30 @@ export function toggleFavorite(id: string): Entry[] {
   }
   const updated = [...entries]
   updated[index] = { ...updated[index], favorite: !updated[index].favorite }
+  setEntries(updated)
+  return updated
+}
+
+export function toggleHidden(id: string): Entry[] {
+  const entries = getStore().get('entries')
+  const index = entries.findIndex((entry) => entry.id === id)
+  if (index === -1) {
+    throw new Error('Eintrag wurde nicht gefunden.')
+  }
+  const updated = [...entries]
+  updated[index] = { ...updated[index], hidden: !updated[index].hidden }
+  setEntries(updated)
+  return updated
+}
+
+function setNotes(id: string, notes: string): Entry[] {
+  const entries = getStore().get('entries')
+  const index = entries.findIndex((entry) => entry.id === id)
+  if (index === -1) {
+    throw new Error('Eintrag wurde nicht gefunden.')
+  }
+  const updated = [...entries]
+  updated[index] = { ...updated[index], notes: notes.trim() || null }
   setEntries(updated)
   return updated
 }
@@ -574,6 +601,10 @@ export function registerEntryHandlers(getWindow: () => BrowserWindow | null): vo
   )
 
   ipcMain.handle('entries:toggleFavorite', (_event, id: string) => toggleFavorite(id))
+
+  ipcMain.handle('entries:toggleHidden', (_event, id: string) => toggleHidden(id))
+
+  ipcMain.handle('entries:setNotes', (_event, id: string, notes: string) => setNotes(id, notes))
 
   ipcMain.handle('entries:setRating', (_event, id: string, rating: number) =>
     setRating(id, rating)

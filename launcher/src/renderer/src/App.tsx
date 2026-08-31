@@ -76,6 +76,19 @@ function isNewEntry(entry: Entry): boolean {
   return Date.now() - entry.addedAt < NEW_THRESHOLD_MS
 }
 
+// Kleines Kürzel-Badge für die Kachel, damit auf einen Blick erkennbar ist,
+// über welchen Client ein Programm läuft — nur für Quellen, die eine eigene
+// Kennung im Eintrag hinterlassen (GOG/EA/Registry-Importe sehen identisch
+// aus wie manuell hinzugefügte Programme, bekommen also bewusst kein Badge).
+function platformBadge(entry: Entry): { label: string; className: string } | null {
+  if (entry.steamAppId) return { label: 'S', className: 'bg-[#1b2838] text-[#66c0f4]' }
+  if (entry.epicAppName) return { label: 'E', className: 'bg-black text-white' }
+  if (entry.battlenetCode) return { label: 'B', className: 'bg-[#00aeff] text-black' }
+  if (entry.ubisoftId) return { label: 'U', className: 'bg-[#0d1c2e] text-white' }
+  if (entry.xboxAumid) return { label: 'X', className: 'bg-[#107c10] text-white' }
+  return null
+}
+
 function App(): ReactElement {
   const [entries, setEntries] = useState<Entry[]>([])
   const [tags, setTags] = useState<Tag[]>([])
@@ -122,6 +135,8 @@ function App(): ReactElement {
   const [missingOnly, setMissingOnly] = useState(false)
   const [missingCoverOnly, setMissingCoverOnly] = useState(false)
   const [recentOnly, setRecentOnly] = useState(false)
+  const [neverPlayedOnly, setNeverPlayedOnly] = useState(false)
+  const [showHidden, setShowHidden] = useState(false)
   const [viewMode, setViewMode] = useState<ViewMode>('grid')
   const [sortMode, setSortMode] = useState<SortMode>('added')
   const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null)
@@ -337,10 +352,12 @@ function App(): ReactElement {
     const statsByEntry = new Map(stats.map((s) => [s.entryId, s]))
 
     const filtered = entries.filter((entry) => {
+      if (!showHidden && entry.hidden) return false
       if (favoritesOnly && !entry.favorite) return false
       if (missingOnly && !missingPaths.has(entry.id)) return false
       if (missingCoverOnly && entry.coverHash) return false
       if (recentOnly && !isNewEntry(entry)) return false
+      if (neverPlayedOnly && (statsByEntry.get(entry.id)?.launchCount ?? 0) > 0) return false
       if (unsortedOnly && entry.tags.length > 0) return false
       if (selectedTagIds.size > 0) {
         const matches =
@@ -385,6 +402,8 @@ function App(): ReactElement {
     missingOnly,
     missingCoverOnly,
     recentOnly,
+    neverPlayedOnly,
+    showHidden,
     missingPaths,
     sortMode,
     stats
@@ -393,6 +412,10 @@ function App(): ReactElement {
   const selectedEntry = entries.find((e) => e.id === selectedEntryId) ?? null
   const missingCoverCount = entries.filter((e) => !e.coverHash).length
   const recentCount = entries.filter(isNewEntry).length
+  const neverPlayedCount = entries.filter(
+    (e) => (stats.find((s) => s.entryId === e.id)?.launchCount ?? 0) === 0
+  ).length
+  const hiddenCount = entries.filter((e) => e.hidden).length
   const suggestedEntry = smartSuggestion
     ? (entries.find((e) => e.id === smartSuggestion.entryId) ?? null)
     : null
@@ -411,7 +434,8 @@ function App(): ReactElement {
       favoritesOnly ||
       missingOnly ||
       missingCoverOnly ||
-      recentOnly
+      recentOnly ||
+      neverPlayedOnly
     )
       return []
     return stats
@@ -429,7 +453,8 @@ function App(): ReactElement {
     favoritesOnly,
     missingOnly,
     missingCoverOnly,
-    recentOnly
+    recentOnly,
+    neverPlayedOnly
   ])
 
   async function handleAdd(): Promise<void> {
@@ -477,6 +502,14 @@ function App(): ReactElement {
 
   async function handleToggleFavorite(entry: Entry): Promise<void> {
     setEntries(await window.api.toggleFavorite(entry.id))
+  }
+
+  async function handleToggleHidden(entry: Entry): Promise<void> {
+    setEntries(await window.api.toggleHidden(entry.id))
+  }
+
+  async function handleSetNotes(id: string, notes: string): Promise<void> {
+    setEntries(await window.api.setNotes(id, notes))
   }
 
   async function handleSetRating(id: string, rating: number): Promise<void> {
@@ -535,6 +568,14 @@ function App(): ReactElement {
   async function handleFetchMetadata(id: string): Promise<void> {
     try {
       setEntries(await window.api.fetchMetadata(id))
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : String(error))
+    }
+  }
+
+  async function handleOpenTrailer(id: string): Promise<void> {
+    try {
+      await window.api.openTrailer(id)
     } catch (error) {
       setStatus(error instanceof Error ? error.message : String(error))
     }
@@ -720,7 +761,8 @@ function App(): ReactElement {
         favoritesOnly,
         missingOnly,
         missingCoverOnly,
-        recentOnly
+        recentOnly,
+        neverPlayedOnly
       })
     )
   }
@@ -735,6 +777,7 @@ function App(): ReactElement {
     setMissingOnly(view.missingOnly)
     setMissingCoverOnly(view.missingCoverOnly)
     setRecentOnly(view.recentOnly)
+    setNeverPlayedOnly(view.neverPlayedOnly)
   }
 
   async function handleRemoveView(id: string): Promise<void> {
@@ -838,6 +881,7 @@ function App(): ReactElement {
     setMissingOnly(false)
     setMissingCoverOnly(false)
     setRecentOnly(false)
+    setNeverPlayedOnly(false)
   }
 
   if (bigPictureMode) {
@@ -1030,6 +1074,12 @@ function App(): ReactElement {
           recentCount={recentCount}
           recentOnly={recentOnly}
           onRecentOnlyChange={setRecentOnly}
+          neverPlayedCount={neverPlayedCount}
+          neverPlayedOnly={neverPlayedOnly}
+          onNeverPlayedOnlyChange={setNeverPlayedOnly}
+          hiddenCount={hiddenCount}
+          showHidden={showHidden}
+          onShowHiddenChange={setShowHidden}
           sortMode={sortMode}
           onSortModeChange={setSortMode}
           onAddTag={handleAddTag}
@@ -1159,7 +1209,9 @@ function App(): ReactElement {
                         : selectedEntryId === entry.id
                           ? 'glow-gold border-gold/60 bg-panel-active'
                           : 'border-border bg-panel hover:border-gold/30 hover:bg-panel-hover'
-                  } ${draggedEntryId === entry.id ? 'opacity-40' : ''}`}
+                  } ${draggedEntryId === entry.id ? 'opacity-40' : ''} ${
+                    entry.hidden ? 'opacity-50' : ''
+                  }`}
                 >
                   <button
                     onClick={(e) => {
@@ -1209,6 +1261,13 @@ function App(): ReactElement {
                       >
                         <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
                         Läuft
+                      </span>
+                    )}
+                    {platformBadge(entry) && (
+                      <span
+                        className={`absolute bottom-1.5 right-1.5 flex h-4 w-4 items-center justify-center rounded-full text-[9px] font-bold leading-none ${platformBadge(entry)?.className}`}
+                      >
+                        {platformBadge(entry)?.label}
                       </span>
                     )}
                   </div>
@@ -1261,7 +1320,9 @@ function App(): ReactElement {
                         : selectedEntryId === entry.id
                           ? 'glow-gold border-gold/60 bg-panel-active'
                           : 'border-transparent hover:bg-panel-hover'
-                  } ${draggedEntryId === entry.id ? 'opacity-40' : ''}`}
+                  } ${draggedEntryId === entry.id ? 'opacity-40' : ''} ${
+                    entry.hidden ? 'opacity-50' : ''
+                  }`}
                 >
                   <EntryIcon
                     iconHash={entry.iconHash}
@@ -1285,6 +1346,13 @@ function App(): ReactElement {
                     {isNewEntry(entry) && (
                       <span className="shrink-0 rounded-full ember-grad-bg px-1.5 py-0.5 text-[9px] font-semibold leading-none text-on-ember">
                         NEU
+                      </span>
+                    )}
+                    {platformBadge(entry) && (
+                      <span
+                        className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[9px] font-bold leading-none ${platformBadge(entry)?.className}`}
+                      >
+                        {platformBadge(entry)?.label}
                       </span>
                     )}
                   </span>
@@ -1353,6 +1421,8 @@ function App(): ReactElement {
             onPickEmulator={handlePickEmulator}
             onClearEmulatorPath={handleClearEmulatorPath}
             onFetchMetadata={handleFetchMetadata}
+            onOpenTrailer={handleOpenTrailer}
+            onSetNotes={handleSetNotes}
           />
         )}
       </div>
@@ -1490,6 +1560,7 @@ function App(): ReactElement {
           onClose={() => setContextMenu(null)}
           onLaunch={handleLaunch}
           onToggleFavorite={handleToggleFavorite}
+          onToggleHidden={handleToggleHidden}
           onToggleTag={handleToggleTag}
           onShowInExplorer={(id) => window.api.showEntryInExplorer(id)}
           onChangeIcon={handleChangeIcon}

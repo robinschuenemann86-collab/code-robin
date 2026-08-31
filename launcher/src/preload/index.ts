@@ -24,6 +24,9 @@ const api = {
   getEntrySize: (id: string): Promise<number | null> => ipcRenderer.invoke('entries:getSize', id),
   toggleFavorite: (id: string): Promise<Entry[]> =>
     ipcRenderer.invoke('entries:toggleFavorite', id),
+  toggleHidden: (id: string): Promise<Entry[]> => ipcRenderer.invoke('entries:toggleHidden', id),
+  setNotes: (id: string, notes: string): Promise<Entry[]> =>
+    ipcRenderer.invoke('entries:setNotes', id, notes),
   setRating: (id: string, rating: number): Promise<Entry[]> =>
     ipcRenderer.invoke('entries:setRating', id, rating),
   bulkSetFavorite: (ids: string[], favorite: boolean): Promise<Entry[]> =>
@@ -119,6 +122,7 @@ const api = {
     ipcRenderer.invoke('metadata:set', clientId, clientSecret),
   fetchMetadata: (id: string): Promise<Entry[]> => ipcRenderer.invoke('metadata:fetch', id),
   fetchAllMissingMetadata: (): Promise<void> => ipcRenderer.invoke('metadata:fetchAllMissing'),
+  openTrailer: (id: string): Promise<void> => ipcRenderer.invoke('metadata:openTrailer', id),
   onOpenMetadataKeyDialog: (callback: () => void): (() => void) => {
     const listener = (): void => callback()
     ipcRenderer.on('metadata:openKeyDialog', listener)

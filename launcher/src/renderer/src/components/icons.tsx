@@ -256,3 +256,14 @@ export function IconHelp(props: IconProps): ReactElement {
     </>
   )
 }
+
+export function IconEyeOff(props: IconProps): ReactElement {
+  return base(
+    props,
+    <>
+      <path d="M3 3l18 18" />
+      <path d="M10.6 5.2A10.6 10.6 0 0 1 12 5c5 0 9 4 10.5 7-.6 1.2-1.5 2.5-2.6 3.6M6.6 6.6C4.5 8 3 10 1.5 12c1.5 3 5.5 7 10.5 7 1.4 0 2.7-.3 3.9-.8" />
+      <path d="M9.9 10a3 3 0 0 0 4.1 4.1" />
+    </>
+  )
+}

@@ -947,7 +947,10 @@ async function importCandidates(candidates: Candidate[]): Promise<Entry[]> {
       description: null,
       genre: null,
       developer: null,
-      releaseYear: null
+      releaseYear: null,
+      videoId: null,
+      hidden: false,
+      notes: null
     })
   }
 

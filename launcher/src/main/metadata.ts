@@ -1,4 +1,4 @@
-import { ipcMain, type BrowserWindow } from 'electron'
+import { ipcMain, shell, type BrowserWindow } from 'electron'
 import { getStore, setEntries, setSettings, type Entry } from './store'
 import { namesLikelyMatch } from './coverArt'
 
@@ -63,6 +63,7 @@ interface IgdbGame {
   genres?: { name: string }[]
   involved_companies?: { company: { name: string }; developer: boolean }[]
   first_release_date?: number
+  videos?: { video_id: string }[]
 }
 
 async function searchIgdbGame(name: string, credentials: IgdbCredentials): Promise<IgdbGame | null> {
@@ -74,7 +75,7 @@ async function searchIgdbGame(name: string, credentials: IgdbCredentials): Promi
       Authorization: `Bearer ${token}`,
       'Content-Type': 'text/plain'
     },
-    body: `search "${name.replace(/"/g, '')}"; fields name,summary,genres.name,involved_companies.company.name,involved_companies.developer,first_release_date; limit 5;`
+    body: `search "${name.replace(/"/g, '')}"; fields name,summary,genres.name,involved_companies.company.name,involved_companies.developer,first_release_date,videos.video_id; limit 5;`
   })
   if (response.status === 401) {
     throw new Error('IGDB-Zugangsdaten sind ungültig.')
@@ -122,16 +123,31 @@ export async function fetchMetadata(entryId: string): Promise<Entry[]> {
     ? new Date(game.first_release_date * 1000).getUTCFullYear()
     : null
   const description = game.summary?.trim() || null
+  const videoId = game.videos?.[0]?.video_id ?? null
 
   // Erst jetzt, nach dem langsamen Netzwerk-Aufruf, den aktuellsten Stand
   // lesen und schreiben — sonst überschreiben sich mehrere gleichzeitig
   // angestoßene Abrufe gegenseitig.
   const latest = getStore().get('entries')
   const updated = latest.map((e) =>
-    e.id === entryId ? { ...e, description, genre, developer, releaseYear } : e
+    e.id === entryId ? { ...e, description, genre, developer, releaseYear, videoId } : e
   )
   setEntries(updated)
   return updated
+}
+
+// Öffnet den Trailer im Standard-Browser statt einer eigenen Videoansicht —
+// die YouTube-Video-ID kommt ausschließlich aus dem bereits gespeicherten
+// Eintrag (von IGDB), nie direkt vom Renderer, damit keine beliebige URL von
+// dort aus geöffnet werden kann (siehe CLAUDE.md, Punkt 4).
+export async function openTrailer(entryId: string): Promise<void> {
+  const entry = getStore()
+    .get('entries')
+    .find((e) => e.id === entryId)
+  if (!entry?.videoId) {
+    throw new Error('Kein Trailer für diesen Eintrag verfügbar.')
+  }
+  await shell.openExternal(`https://www.youtube.com/watch?v=${encodeURIComponent(entry.videoId)}`)
 }
 
 // Läuft nach dem Hinzufügen neuer Einträge automatisch im Hintergrund, analog
@@ -200,6 +216,8 @@ export function registerMetadataHandlers(getWindow: () => BrowserWindow | null):
   })
 
   ipcMain.handle('metadata:fetch', (_event, entryId: string) => fetchMetadata(entryId))
+
+  ipcMain.handle('metadata:openTrailer', (_event, entryId: string) => openTrailer(entryId))
 
   ipcMain.handle('metadata:fetchAllMissing', async () => {
     const window = getWindow()

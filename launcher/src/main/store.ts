@@ -59,7 +59,16 @@ const EntrySchema = z.object({
   description: z.string().nullable().default(null),
   genre: z.string().nullable().default(null),
   developer: z.string().nullable().default(null),
-  releaseYear: z.number().nullable().default(null)
+  releaseYear: z.number().nullable().default(null),
+  // YouTube-Video-ID eines Trailers, ebenfalls von IGDB — siehe metadata.ts.
+  videoId: z.string().nullable().default(null),
+  // Ausgeblendete Einträge tauchen nicht in der normalen Ansicht auf (siehe
+  // App.tsx showHidden), bleiben aber vollständig erhalten — für Tools/Reste,
+  // die man nicht löschen, aber auch nicht ständig sehen will.
+  hidden: z.boolean().default(false),
+  // Freier Notiztext pro Programm (z. B. Passwörter, Fortschritt) — rein lokal,
+  // wird nie an Cover-Art/Metadaten-Dienste geschickt.
+  notes: z.string().nullable().default(null)
 })
 
 const TagSchema = z.object({
@@ -100,7 +109,8 @@ const SavedViewSchema = z.object({
   favoritesOnly: z.boolean(),
   missingOnly: z.boolean().default(false),
   missingCoverOnly: z.boolean().default(false),
-  recentOnly: z.boolean().default(false)
+  recentOnly: z.boolean().default(false),
+  neverPlayedOnly: z.boolean().default(false)
 })
 
 const StoreDataSchema = z.object({

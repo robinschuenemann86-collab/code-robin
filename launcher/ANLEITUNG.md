@@ -22,6 +22,14 @@ Willkommen bei MR Launch! Hier die wichtigsten Funktionen auf einen Blick.
 - **Mehrfachauswahl**: Strg+Klick oder Umschalt+Klick markiert mehrere
   Programme gleichzeitig, dann unten in der Leiste in einem Schritt
   favorisieren, taggen oder entfernen.
+- **Programme ausblenden**: per Rechtsklick → "Ausblenden" ein Programm aus
+  der normalen Ansicht nehmen, ohne es zu löschen (z. B. für Tools). Über
+  "Ausgeblendete anzeigen" in der Seitenleiste wieder sichtbar machen.
+- **Eigene Notizen**: im Detail-Panel ganz unten ein freier Textbereich für
+  eigene Anmerkungen zu einem Programm.
+- **"Nie gespielt"-Filter**: in der Seitenleiste zeigt dieser Filter nur
+  Programme, die noch nie gestartet wurden — praktisch, um den Backlog zu
+  sichten.
 
 ## Cover-Art
 
@@ -48,6 +56,9 @@ Willkommen bei MR Launch! Hier die wichtigsten Funktionen auf einen Blick.
   Detail-Panel bei Steam-Titeln. Dafür über "…" → "Steam-Erfolge…" einen
   kostenlosen Steam-API-Key (steamcommunity.com/dev/apikey) und die eigene
   SteamID64 eintragen. Das Steam-Profil muss dafür auf "Öffentlich" stehen.
+- **Trailer-Link**: sobald IGDB-Metadaten aktiv sind und ein Trailer bekannt
+  ist, öffnet ein Klick auf "Trailer ansehen" im Detail-Panel das YouTube-Video
+  im Standard-Browser.
 
 ## Spielzeit & Statistik
 
@@ -70,6 +81,11 @@ Willkommen bei MR Launch! Hier die wichtigsten Funktionen auf einen Blick.
   läuft, auch wenn das Hauptfenster im Hintergrund ist.
 - **Soundeffekte** und der **Lautsprecher-Knopf** in der Seitenleiste zum
   Abschalten.
+- **"NEU"-Markierung**: Programme, die gerade erst hinzugefügt wurden,
+  bekommen kurzzeitig ein kleines Abzeichen auf der Kachel.
+- **Plattform-Symbol**: ein kleines Symbol auf der Kachel zeigt bei Steam-,
+  Epic-, Battle.net-, Ubisoft- und Xbox-Titeln auf einen Blick, woher sie
+  kommen.
 
 ## Big-Picture-Modus
 

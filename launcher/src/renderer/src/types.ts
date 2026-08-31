@@ -23,6 +23,9 @@ export interface Entry {
   genre: string | null
   developer: string | null
   releaseYear: number | null
+  videoId: string | null
+  hidden: boolean
+  notes: string | null
 }
 
 export interface Tag {
@@ -49,6 +52,7 @@ export interface SavedView {
   missingOnly: boolean
   missingCoverOnly: boolean
   recentOnly: boolean
+  neverPlayedOnly: boolean
 }
 
 export interface Candidate {
