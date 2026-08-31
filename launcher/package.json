@@ -1,7 +1,7 @@
 {
   "name": "launcher",
   "version": "1.30.0",
-  "description": "An Electron application with React and TypeScript",
+  "description": "MR Launch — Spiele- und Programm-Launcher für Windows",
   "main": "./out/main/index.js",
   "author": "Robin Schünemann",
   "homepage": "https://github.com/robinschuenemann86-collab/code-robin",

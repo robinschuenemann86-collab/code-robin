@@ -1,5 +1,6 @@
 appId: de.robinschuenemann.mrlauncher
 productName: MR Launch
+copyright: Copyright © 2026 Robin Schünemann
 directories:
   buildResources: build
 files:
@@ -13,6 +14,10 @@ asarUnpack:
   - resources/**
 win:
   executableName: launcher
+  # Erscheint in den Dateieigenschaften und im SmartScreen-Dialog. Fehlt diese
+  # Angabe, ist die EXE "herausgeberlos" — eines der Signale, die Defenders
+  # ML-Heuristik (Wacatac.B!ml) bei unsignierten Installern anschlagen lassen.
+  publisherName: Robin Schünemann
   target:
     - nsis
     - portable
