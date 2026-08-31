@@ -14,10 +14,10 @@ asarUnpack:
   - resources/**
 win:
   executableName: launcher
-  # Erscheint in den Dateieigenschaften und im SmartScreen-Dialog. Fehlt diese
-  # Angabe, ist die EXE "herausgeberlos" — eines der Signale, die Defenders
-  # ML-Heuristik (Wacatac.B!ml) bei unsignierten Installern anschlagen lassen.
-  publisherName: Robin Schünemann
+  # Herausgeber/Beschreibung der EXE kommen aus package.json (author,
+  # description) und dem copyright oben — nicht aus einem eigenen Feld hier.
+  # win.publisherName gibt es seit electron-builder 26 nicht mehr; es lebt
+  # jetzt unter signtoolOptions und betrifft nur die Signaturpruefung.
   target:
     - nsis
     - portable
