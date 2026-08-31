@@ -29,6 +29,7 @@ import { OverviewDialog } from './components/OverviewDialog'
 import { CoverArtKeyDialog } from './components/CoverArtKeyDialog'
 import { MetadataKeyDialog } from './components/MetadataKeyDialog'
 import { SteamAchievementsKeyDialog } from './components/SteamAchievementsKeyDialog'
+import { SystemMonitorPanel } from './components/SystemMonitorPanel'
 import { HelpDialog } from './components/HelpDialog'
 import { ConfirmDialog } from './components/ConfirmDialog'
 import { EntryContextMenu } from './components/EntryContextMenu'
@@ -50,6 +51,7 @@ import {
   IconClock,
   IconDice,
   IconExpand,
+  IconGauge,
   IconHelp,
   IconMore,
   IconPlus,
@@ -104,6 +106,7 @@ function App(): ReactElement {
     return () => clearTimeout(timeout)
   }, [status])
   const [scannerOpen, setScannerOpen] = useState(false)
+  const [systemMonitorOpen, setSystemMonitorOpen] = useState(false)
   const [statsOpen, setStatsOpen] = useState(false)
   const [overviewOpen, setOverviewOpen] = useState(false)
   const [overview, setOverview] = useState<OverviewData | null>(null)
@@ -951,6 +954,17 @@ function App(): ReactElement {
             <IconSearch />
           </button>
           <button
+            onClick={() => setSystemMonitorOpen((open) => !open)}
+            title="System-Auslastung"
+            className={`rounded-lg border p-2.5 transition ${
+              systemMonitorOpen
+                ? 'border-gold/50 bg-panel-active text-gold'
+                : 'border-border bg-panel text-text hover:border-gold/50 hover:text-gold'
+            }`}
+          >
+            <IconGauge />
+          </button>
+          <button
             onClick={handleRandomPick}
             title="Was soll ich spielen? (Umschalt+Klick: nur Favoriten)"
             className="rounded-lg border border-border bg-panel p-2.5 text-text transition hover:border-gold/50 hover:text-gold"
@@ -1541,6 +1555,10 @@ function App(): ReactElement {
 
       {steamAchievementsKeyDialogOpen && (
         <SteamAchievementsKeyDialog onClose={() => setSteamAchievementsKeyDialogOpen(false)} />
+      )}
+
+      {systemMonitorOpen && (
+        <SystemMonitorPanel onClose={() => setSystemMonitorOpen(false)} />
       )}
 
       {syncDialogOpen && (

@@ -18,6 +18,7 @@ import { loadWindowBounds, saveWindowBounds } from './windowBounds'
 import { registerCoverArtHandlers } from './coverArt'
 import { registerMetadataHandlers } from './metadata'
 import { registerSteamAchievementsHandlers } from './steamAchievements'
+import { registerSystemMonitorHandlers } from './systemMonitor'
 import { registerSavedViewHandlers } from './savedViews'
 import { registerOnboardingHandlers } from './onboarding'
 import { registerScreenshotHandlers } from './screenshots'
@@ -135,6 +136,7 @@ app.whenReady().then(() => {
   registerCoverArtHandlers(() => mainWindow)
   registerMetadataHandlers()
   registerSteamAchievementsHandlers()
+  registerSystemMonitorHandlers()
   registerSavedViewHandlers()
   registerOnboardingHandlers()
   registerScreenshotHandlers()

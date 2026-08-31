@@ -11,6 +11,15 @@ Willkommen bei MR Launch! Hier die wichtigsten Funktionen auf einen Blick.
   Ubisoft Connect, EA/Origin, GOG Galaxy, Xbox/Microsoft Store) und zeigt sie
   zur Auswahl an, bevor irgendetwas übernommen wird.
 
+## System-Auslastung
+
+Der Tacho-Knopf oben rechts zeigt ein kleines Seitenpanel mit der aktuellen
+Auslastung von Prozessor, Arbeitsspeicher und Grafikkarte an (als runde
+Anzeigen, alle 2 Sekunden aktualisiert) — rein informativ, wirkt sich nicht auf
+gestartete Spiele aus. Die Grafikkarten-Temperatur wird bei NVIDIA-Karten mit
+angezeigt. Die Prozessor-Temperatur lässt sich leider nicht auf jedem PC
+zuverlässig auslesen — fehlt sie, bleibt einfach nur die Prozentanzeige übrig.
+
 ## Ordnung halten
 
 - **Tags**: eigene Kategorien mit Farbe, in der Seitenleiste anlegen und per

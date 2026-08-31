@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer } from 'electron'
 import type { Entry, SavedView, Session, Tag } from '../main/store'
 import type { Candidate, ScanResult } from '../main/scanner'
 import type { SteamAchievement } from '../main/steamAchievements'
+import type { SystemStats } from '../main/systemMonitor'
 import type { EntryStats, OverviewData, SmartSuggestion, WrappedData } from '../main/stats'
 import type { SyncResult } from '../main/sync'
 import type { UpdaterStatus } from '../main/updater'
@@ -139,6 +140,8 @@ const api = {
     ipcRenderer.on('steamAchievements:openKeyDialog', listener)
     return () => ipcRenderer.removeListener('steamAchievements:openKeyDialog', listener)
   },
+
+  getSystemStats: (): Promise<SystemStats> => ipcRenderer.invoke('systemMonitor:get'),
 
   getScreenshots: (id: string): Promise<string[]> =>
     ipcRenderer.invoke('screenshots:getForEntry', id),

@@ -1,6 +1,7 @@
 import type { Entry, SavedView, Session, Tag } from '../main/store'
 import type { Candidate, ScanResult } from '../main/scanner'
 import type { SteamAchievement } from '../main/steamAchievements'
+import type { SystemStats } from '../main/systemMonitor'
 import type { EntryStats, OverviewData, SmartSuggestion, WrappedData } from '../main/stats'
 import type { SyncResult } from '../main/sync'
 import type { UpdaterStatus } from '../main/updater'
@@ -83,6 +84,8 @@ export interface LauncherApi {
   setSteamAchievementsCredentials: (apiKey: string, steamId: string) => Promise<void>
   fetchSteamAchievements: (appId: string) => Promise<SteamAchievement[]>
   onOpenSteamAchievementsKeyDialog: (callback: () => void) => () => void
+
+  getSystemStats: () => Promise<SystemStats>
 
   getScreenshots: (id: string) => Promise<string[]>
 

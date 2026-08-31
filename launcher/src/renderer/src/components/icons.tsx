@@ -257,6 +257,17 @@ export function IconHelp(props: IconProps): ReactElement {
   )
 }
 
+export function IconGauge(props: IconProps): ReactElement {
+  return base(
+    props,
+    <>
+      <path d="M4 15.5a8.5 8.5 0 1 1 16 0" />
+      <path d="M12 15.5 15.5 9" />
+      <path d="M12 15.5h.01" />
+    </>
+  )
+}
+
 export function IconEyeOff(props: IconProps): ReactElement {
   return base(
     props,
