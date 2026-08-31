@@ -29,6 +29,12 @@ nsis:
   artifactName: MR-Launch-Setup.${ext}
   shortcutName: ${productName}
   uninstallDisplayName: ${productName}
+  # Richtiger Installations-Assistent statt stillem Ein-Klick-Durchlauf:
+  # wirkt fuer Nutzer wie fuer Windows vertrauenswuerdiger. Still installieren
+  # und danach etwas starten ist eines der Verhaltensmuster, auf die Defenders
+  # ML-Heuristik anspringt.
+  oneClick: false
+  allowToChangeInstallationDirectory: true
   createDesktopShortcut: always
 portable:
   artifactName: ${name}-${version}-portable.${ext}
