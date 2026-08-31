@@ -90,7 +90,18 @@ export function DetailPanel({
   const [lightboxHash, setLightboxHash] = useState<string | null>(null)
   const [achievements, setAchievements] = useState<SteamAchievement[]>([])
   const [achievementsError, setAchievementsError] = useState<string | null>(null)
-  const canUseLaunchArgs = !entry.steamAppId && !entry.epicAppName && !entry.battlenetCode
+  // Diese Quellen starten über den jeweiligen Client (siehe launchEntry in
+  // entries.ts) — Start-Parameter und Emulator würden dort nie gelesen bzw.
+  // nie ausgeführt, das Eingabefeld/die Auswahl also nur vortäuschen, dass sie
+  // etwas bewirken.
+  const isClientLaunched = !!(
+    entry.steamAppId ||
+    entry.epicAppName ||
+    entry.battlenetCode ||
+    entry.ubisoftId ||
+    entry.xboxAumid
+  )
+  const canUseLaunchArgs = !isClientLaunched
 
   useEffect(() => {
     setSize('loading')
@@ -328,14 +339,16 @@ export function DetailPanel({
         </span>
       </div>
 
-      {entry.description ? (
+      {entry.description || entry.genre || entry.developer || entry.releaseYear ? (
         <div className="flex flex-col gap-1.5">
           <span className="font-display text-[11px] font-bold tracking-wider text-text-muted">
             {[entry.genre, entry.developer, entry.releaseYear?.toString()]
               .filter(Boolean)
               .join(' · ') || 'INFO'}
           </span>
-          <p className="text-xs leading-relaxed text-text-muted">{entry.description}</p>
+          {entry.description && (
+            <p className="text-xs leading-relaxed text-text-muted">{entry.description}</p>
+          )}
           {entry.videoId && (
             <button
               onClick={() => onOpenTrailer(entry.id)}
@@ -374,6 +387,7 @@ export function DetailPanel({
         </div>
       )}
 
+      {!isClientLaunched && (
       <div className="flex flex-col gap-1.5">
         <span className="font-display text-[11px] font-bold tracking-wider text-text-muted">
           EMULATOR
@@ -403,6 +417,7 @@ export function DetailPanel({
           </button>
         )}
       </div>
+      )}
 
       <div className="flex flex-col gap-1.5">
         <span className="font-display text-[11px] font-bold tracking-wider text-text-muted">

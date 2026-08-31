@@ -177,8 +177,16 @@ async function pickEmulator(window: BrowserWindow, id: string): Promise<Entry[]>
   })
   if (result.canceled || result.filePaths.length === 0) return entries
 
+  // expectedProcessName muss auf den Emulator zeigen, nicht auf die ROM-Datei
+  // selbst — sonst pollt playtime.ts für immer auf einen Prozessnamen, der nie
+  // läuft (der Emulator ist der tatsächlich gestartete Prozess), und die
+  // Spielzeit-Erfassung bricht für jeden Emulator-Eintrag lautlos ab.
   const updated = [...entries]
-  updated[index] = { ...updated[index], emulatorPath: result.filePaths[0] }
+  updated[index] = {
+    ...updated[index],
+    emulatorPath: result.filePaths[0],
+    expectedProcessName: basename(result.filePaths[0])
+  }
   setEntries(updated)
   return updated
 }

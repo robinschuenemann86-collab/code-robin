@@ -76,7 +76,6 @@ export interface LauncherApi {
   getMetadataCredentials: () => Promise<{ clientId: string; clientSecret: string } | null>
   setMetadataCredentials: (clientId: string, clientSecret: string) => Promise<void>
   fetchMetadata: (id: string) => Promise<Entry[]>
-  fetchAllMissingMetadata: () => Promise<void>
   openTrailer: (id: string) => Promise<void>
   onOpenMetadataKeyDialog: (callback: () => void) => () => void
 

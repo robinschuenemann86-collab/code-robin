@@ -258,14 +258,18 @@ function tryRecoverFromBackup(): StoreData | null {
 // gefahrlos aus dem gespeicherten Pfad nachtragen.
 function backfillExpectedProcessNames(): void {
   const entries = store.get('entries')
+  // xboxAumid-Einträge starten nie über `path` (das ist bei ihnen nur der
+  // UWP-Installationsordner, keine ausführbare Datei) — ein Backfill auf
+  // `basename(e.path)` würde einen sinnlosen Prozessnamen erzeugen und die
+  // Spielzeit-Erfassung für sie dauerhaft kaputt machen.
   const needsBackfill = entries.some(
-    (e) => !e.expectedProcessName && !e.steamAppId && !e.epicAppName
+    (e) => !e.expectedProcessName && !e.steamAppId && !e.epicAppName && !e.xboxAumid
   )
   if (!needsBackfill) return
 
   setEntries(
     entries.map((e) =>
-      !e.expectedProcessName && !e.steamAppId && !e.epicAppName
+      !e.expectedProcessName && !e.steamAppId && !e.epicAppName && !e.xboxAumid
         ? { ...e, expectedProcessName: basename(e.path) }
         : e
     )

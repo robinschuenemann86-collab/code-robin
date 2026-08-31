@@ -44,7 +44,7 @@ export function SteamAchievementsKeyDialog({
           Zeigt echte Steam-Erfolge im Detailpanel. Kostenlosen Key auf{' '}
           <span className="text-gold">steamcommunity.com/dev/apikey</span> erstellen. Die eigene
           SteamID64 findet man z. B. über <span className="text-gold">steamid.io</span>. Das
-          Steam-Profil muss auf "Öffentlich" stehen.
+          Steam-Profil muss auf &quot;Öffentlich&quot; stehen.
         </p>
 
         <input

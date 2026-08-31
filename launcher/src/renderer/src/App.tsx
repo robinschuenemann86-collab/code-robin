@@ -347,9 +347,10 @@ function App(): ReactElement {
     setOverview(await window.api.getOverview())
   }
 
+  const statsByEntry = useMemo(() => new Map(stats.map((s) => [s.entryId, s])), [stats])
+
   const filteredEntries = useMemo(() => {
     const query = searchQuery.trim().toLowerCase()
-    const statsByEntry = new Map(stats.map((s) => [s.entryId, s]))
 
     const filtered = entries.filter((entry) => {
       if (!showHidden && entry.hidden) return false
@@ -406,14 +407,20 @@ function App(): ReactElement {
     showHidden,
     missingPaths,
     sortMode,
-    stats
+    statsByEntry
   ])
 
   const selectedEntry = entries.find((e) => e.id === selectedEntryId) ?? null
-  const missingCoverCount = entries.filter((e) => !e.coverHash).length
-  const recentCount = entries.filter(isNewEntry).length
-  const neverPlayedCount = entries.filter(
-    (e) => (stats.find((s) => s.entryId === e.id)?.launchCount ?? 0) === 0
+  // Zählt nur unter denselben Bedingungen, unter denen der Filter sie auch
+  // tatsächlich zeigen würde — sonst zeigt die Seitenleiste z. B. "Nie
+  // gespielt (5)", aber der Klick darauf liefert weniger Treffer, weil
+  // ausgeblendete Einträge dort schon rausgefiltert werden (siehe
+  // filteredEntries oben).
+  const visibleEntries = showHidden ? entries : entries.filter((e) => !e.hidden)
+  const missingCoverCount = visibleEntries.filter((e) => !e.coverHash).length
+  const recentCount = visibleEntries.filter(isNewEntry).length
+  const neverPlayedCount = visibleEntries.filter(
+    (e) => (statsByEntry.get(e.id)?.launchCount ?? 0) === 0
   ).length
   const hiddenCount = entries.filter((e) => e.hidden).length
   const suggestedEntry = smartSuggestion
@@ -443,7 +450,9 @@ function App(): ReactElement {
       .sort((a, b) => (b.lastPlayedAt ?? 0) - (a.lastPlayedAt ?? 0))
       .slice(0, 6)
       .map((s) => entries.find((e) => e.id === s.entryId))
-      .filter((e): e is Entry => e !== undefined)
+      // Ausgeblendete Einträge tauchen sonst hier weiter auf, obwohl "Ausblenden"
+      // genau das verhindern soll — siehe filteredEntries' showHidden-Check oben.
+      .filter((e): e is Entry => e !== undefined && (showHidden || !e.hidden))
   }, [
     stats,
     entries,
@@ -454,6 +463,7 @@ function App(): ReactElement {
     missingOnly,
     missingCoverOnly,
     recentOnly,
+    showHidden,
     neverPlayedOnly
   ])
 
@@ -882,6 +892,7 @@ function App(): ReactElement {
     setMissingCoverOnly(false)
     setRecentOnly(false)
     setNeverPlayedOnly(false)
+    setShowHidden(false)
   }
 
   if (bigPictureMode) {
@@ -1174,7 +1185,9 @@ function App(): ReactElement {
             </div>
           ) : viewMode === 'grid' ? (
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
-              {filteredEntries.map((entry, index) => (
+              {filteredEntries.map((entry, index) => {
+                const badge = platformBadge(entry)
+                return (
                 <div
                   key={entry.id}
                   draggable
@@ -1263,11 +1276,11 @@ function App(): ReactElement {
                         Läuft
                       </span>
                     )}
-                    {platformBadge(entry) && (
+                    {badge && (
                       <span
-                        className={`absolute bottom-1.5 right-1.5 flex h-4 w-4 items-center justify-center rounded-full text-[9px] font-bold leading-none ${platformBadge(entry)?.className}`}
+                        className={`absolute bottom-1.5 right-1.5 flex h-4 w-4 items-center justify-center rounded-full text-[9px] font-bold leading-none ${badge.className}`}
                       >
-                        {platformBadge(entry)?.label}
+                        {badge.label}
                       </span>
                     )}
                   </div>
@@ -1281,11 +1294,14 @@ function App(): ReactElement {
                     <span className="truncate">{entry.name}</span>
                   </span>
                 </div>
-              ))}
+                )
+              })}
             </div>
           ) : (
             <div className="flex flex-col gap-1">
-              {filteredEntries.map((entry, index) => (
+              {filteredEntries.map((entry, index) => {
+                const badge = platformBadge(entry)
+                return (
                 <div
                   key={entry.id}
                   draggable
@@ -1348,11 +1364,11 @@ function App(): ReactElement {
                         NEU
                       </span>
                     )}
-                    {platformBadge(entry) && (
+                    {badge && (
                       <span
-                        className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[9px] font-bold leading-none ${platformBadge(entry)?.className}`}
+                        className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[9px] font-bold leading-none ${badge.className}`}
                       >
-                        {platformBadge(entry)?.label}
+                        {badge.label}
                       </span>
                     )}
                   </span>
@@ -1395,7 +1411,8 @@ function App(): ReactElement {
                     <IconTrash className="h-3.5 w-3.5" />
                   </button>
                 </div>
-              ))}
+                )
+              })}
             </div>
           )}
         </main>
@@ -1406,7 +1423,7 @@ function App(): ReactElement {
             entry={selectedEntry}
             tags={tags}
             pathMissing={missingPaths.has(selectedEntry.id)}
-            stats={stats.find((s) => s.entryId === selectedEntry.id) ?? null}
+            stats={statsByEntry.get(selectedEntry.id) ?? null}
             onLaunch={handleLaunch}
             onRename={handleRename}
             onSetLaunchArgs={handleSetLaunchArgs}

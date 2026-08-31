@@ -7,6 +7,15 @@ interface IgdbCredentials {
   clientSecret: string
 }
 
+// `description` allein reicht nicht als "wurde schon gesucht"-Markierung —
+// IGDB liefert für manche Treffer keinen Summary-Text, obwohl Genre/Entwickler/
+// Erscheinungsjahr durchaus gefunden wurden. Mit nur `description` als Filter
+// würde so ein Eintrag bei jedem "Fehlende Metadaten nachladen" erneut
+// abgefragt, für immer.
+function hasMetadata(entry: Entry): boolean {
+  return !!(entry.description || entry.genre || entry.developer || entry.releaseYear)
+}
+
 export function getIgdbCredentials(): IgdbCredentials | null {
   const settings = getStore().get('settings')
   const clientId = typeof settings.igdbClientId === 'string' ? settings.igdbClientId.trim() : ''
@@ -174,7 +183,7 @@ async function fetchMetadataForIdsWithStatus(window: BrowserWindow, ids: string[
     getStore()
       .get('entries')
       .filter((entry) => ids.includes(entry.id))
-      .map((entry) => [entry.id, entry.description])
+      .map((entry) => [entry.id, hasMetadata(entry)])
   )
 
   await fetchMetadataForNewEntries(ids, (entries) =>
@@ -183,7 +192,7 @@ async function fetchMetadataForIdsWithStatus(window: BrowserWindow, ids: string[
 
   const found = getStore()
     .get('entries')
-    .filter((entry) => before.has(entry.id) && entry.description !== before.get(entry.id)).length
+    .filter((entry) => before.get(entry.id) === false && hasMetadata(entry)).length
   window.webContents.send('status:message', `Metadaten für ${found} von ${ids.length} Programmen gefunden.`)
 }
 
@@ -198,7 +207,7 @@ export async function fetchMissingMetadataForAll(window: BrowserWindow): Promise
 
   const missingIds = getStore()
     .get('entries')
-    .filter((entry) => !entry.description)
+    .filter((entry) => !hasMetadata(entry))
     .map((entry) => entry.id)
   if (missingIds.length === 0) {
     window.webContents.send('status:message', 'Alle Programme haben bereits Metadaten.')
@@ -208,7 +217,7 @@ export async function fetchMissingMetadataForAll(window: BrowserWindow): Promise
   await fetchMetadataForIdsWithStatus(window, missingIds)
 }
 
-export function registerMetadataHandlers(getWindow: () => BrowserWindow | null): void {
+export function registerMetadataHandlers(): void {
   ipcMain.handle('metadata:get', () => getIgdbCredentials())
 
   ipcMain.handle('metadata:set', (_event, clientId: string, clientSecret: string) => {
@@ -218,10 +227,4 @@ export function registerMetadataHandlers(getWindow: () => BrowserWindow | null):
   ipcMain.handle('metadata:fetch', (_event, entryId: string) => fetchMetadata(entryId))
 
   ipcMain.handle('metadata:openTrailer', (_event, entryId: string) => openTrailer(entryId))
-
-  ipcMain.handle('metadata:fetchAllMissing', async () => {
-    const window = getWindow()
-    if (!window) return
-    await fetchMissingMetadataForAll(window)
-  })
 }

@@ -757,9 +757,17 @@ function readXboxManifest(installLocation: string): XboxManifestInfo {
     return { isGame: false, appId: null, executable: null, displayName: null }
   }
 
-  const isGame = /<uap5?:GamingOptions\b/i.test(xml)
+  // Pakete mit mehreren <Application>-Einträgen (z. B. Spiel + Begleit-App)
+  // gibt es durchaus — ein globaler "kommt GamingOptions irgendwo in der Datei
+  // vor"-Test kombiniert mit "nimm einfach die erste Application" kann so App
+  // und GamingOptions-Flag auseinanderreißen. Stattdessen wird pro
+  // <Application>-Block geprüft, welcher davon GamingOptions tatsächlich enthält.
+  const appBlocks =
+    xml.match(/<Application\b[^>]*>[\s\S]*?<\/Application>|<Application\b[^>]*\/>/gi) ?? []
+  const gameBlock = appBlocks.find((block) => /<uap5?:GamingOptions\b/i.test(block)) ?? null
+  const isGame = gameBlock !== null
 
-  const appTagMatch = xml.match(/<Application\b[^>]*\/?>/i)
+  const appTagMatch = gameBlock?.match(/<Application\b[^>]*>/i)
   const appTag = appTagMatch ? appTagMatch[0] : ''
   const appIdMatch = appTag.match(/\bId="([^"]+)"/i)
   const executableMatch = appTag.match(/\bExecutable="([^"]+)"/i)

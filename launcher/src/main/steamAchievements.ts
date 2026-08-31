@@ -24,10 +24,6 @@ export function setSteamCredentials(apiKey: string, steamId: string): void {
   })
 }
 
-export function canFetchSteamAchievements(): boolean {
-  return getSteamCredentials() !== null
-}
-
 export interface SteamAchievement {
   apiName: string
   name: string

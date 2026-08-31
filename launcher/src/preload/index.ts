@@ -121,7 +121,6 @@ const api = {
   setMetadataCredentials: (clientId: string, clientSecret: string): Promise<void> =>
     ipcRenderer.invoke('metadata:set', clientId, clientSecret),
   fetchMetadata: (id: string): Promise<Entry[]> => ipcRenderer.invoke('metadata:fetch', id),
-  fetchAllMissingMetadata: (): Promise<void> => ipcRenderer.invoke('metadata:fetchAllMissing'),
   openTrailer: (id: string): Promise<void> => ipcRenderer.invoke('metadata:openTrailer', id),
   onOpenMetadataKeyDialog: (callback: () => void): (() => void) => {
     const listener = (): void => callback()

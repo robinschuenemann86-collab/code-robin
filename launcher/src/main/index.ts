@@ -133,7 +133,7 @@ app.whenReady().then(() => {
   registerFullscreenHandlers(() => mainWindow)
   registerAppMenuHandlers(() => mainWindow)
   registerCoverArtHandlers(() => mainWindow)
-  registerMetadataHandlers(() => mainWindow)
+  registerMetadataHandlers()
   registerSteamAchievementsHandlers()
   registerSavedViewHandlers()
   registerOnboardingHandlers()

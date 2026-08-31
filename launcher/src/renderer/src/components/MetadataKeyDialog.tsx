@@ -41,8 +41,8 @@ export function MetadataKeyDialog({ onClose }: MetadataKeyDialogProps): ReactEle
         <p className="text-sm text-text-muted">
           Lädt Beschreibung, Genre, Entwickler und Erscheinungsjahr nach. Kostenlose
           Zugangsdaten auf <span className="text-gold">dev.twitch.tv/console/apps</span> unter
-          "Register Your Application" erstellen (Kategorie beliebig) — Client-ID und Client
-          Secret hier eintragen.
+          &quot;Register Your Application&quot; erstellen (Kategorie beliebig) — Client-ID und
+          Client Secret hier eintragen.
         </p>
 
         <input
