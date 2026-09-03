@@ -34,7 +34,8 @@ interface DetailPanelProps {
   onSetLaunchArgs: (id: string, args: string) => void
   onToggleTag: (id: string, tagId: string) => void
   onChangeIcon: (id: string) => void
-  onFetchCoverArt: (id: string) => void
+  onFetchCoverArt: (id: string, searchName?: string) => void
+  onPickCustomCover: (id: string) => void
   onToggleFavorite: (entry: Entry) => void
   onSetRating: (id: string, rating: number) => void
   onRemove: (entry: Entry) => void
@@ -66,6 +67,7 @@ export function DetailPanel({
   onToggleTag,
   onChangeIcon,
   onFetchCoverArt,
+  onPickCustomCover,
   onToggleFavorite,
   onSetRating,
   onRemove,
@@ -83,6 +85,8 @@ export function DetailPanel({
   const [preLaunchCommand, setPreLaunchCommand] = useState(entry.preLaunchCommand ?? '')
   const [postLaunchCommand, setPostLaunchCommand] = useState(entry.postLaunchCommand ?? '')
   const [notes, setNotes] = useState(entry.notes ?? '')
+  const [coverSearchOpen, setCoverSearchOpen] = useState(false)
+  const [coverSearchName, setCoverSearchName] = useState(entry.name)
   const [size, setSize] = useState<number | null | 'loading'>('loading')
   const [sessions, setSessions] = useState<Session[]>([])
   const [accentColor, setAccentColor] = useState<string | null>(null)
@@ -260,6 +264,47 @@ export function DetailPanel({
         >
           {entry.coverHash ? 'Cover-Art neu laden' : 'Cover-Art laden'}
         </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setCoverSearchOpen((open) => !open)}
+            className="text-[11px] text-text-muted underline-offset-2 hover:text-gold hover:underline"
+          >
+            anderer Name …
+          </button>
+          <button
+            onClick={() => onPickCustomCover(entry.id)}
+            className="text-[11px] text-text-muted underline-offset-2 hover:text-gold hover:underline"
+          >
+            eigenes Bild …
+          </button>
+        </div>
+        {coverSearchOpen && (
+          <div className="flex w-full flex-col gap-1.5">
+            <input
+              autoFocus
+              value={coverSearchName}
+              onChange={(e) => setCoverSearchName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  onFetchCoverArt(entry.id, coverSearchName)
+                  setCoverSearchOpen(false)
+                }
+                if (e.key === 'Escape') setCoverSearchOpen(false)
+              }}
+              placeholder="Titel, unter dem gesucht wird"
+              className="w-full rounded-lg border border-border bg-panel px-2 py-1.5 text-xs text-text outline-none focus:border-gold/50"
+            />
+            <button
+              onClick={() => {
+                onFetchCoverArt(entry.id, coverSearchName)
+                setCoverSearchOpen(false)
+              }}
+              className="rounded-lg border border-border bg-panel px-2 py-1 text-xs text-text transition hover:border-gold/50 hover:text-gold"
+            >
+              Unter diesem Namen suchen
+            </button>
+          </div>
+        )}
         {editingName ? (
           <input
             autoFocus

@@ -24,11 +24,16 @@ export interface Candidate {
   likelyRelevant: boolean
 }
 
+// Absoluter Pfad statt bloßem Namen: bei einem bloßen Namen sucht Windows
+// zuerst im Programm- und Arbeitsverzeichnis, eine dort abgelegte gleichnamige
+// Datei würde also anstelle des echten Werkzeugs ausgeführt.
+const REG_EXE = join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'reg.exe')
+
 function runReg(args: string[]): Promise<string> {
   return new Promise((resolve) => {
     let stdout = ''
     try {
-      const child = spawn('reg', args, { windowsHide: true })
+      const child = spawn(REG_EXE, args, { windowsHide: true })
       child.stdout.on('data', (chunk) => (stdout += chunk.toString()))
       child.on('error', () => resolve(''))
       child.on('close', () => resolve(stdout))
@@ -236,6 +241,10 @@ async function scanSteam(
   const libraries = readLibraryFolders(steamPath)
   const candidates: Candidate[] = []
   const skipped: string[] = []
+  // Verschiebt man ein Spiel auf ein anderes Laufwerk, lässt Steam die alte
+  // Verwaltungsdatei gern in der ursprünglichen Bibliothek zurück. Dasselbe
+  // Spiel taucht dann in zwei Bibliotheken auf und würde doppelt vorgeschlagen.
+  const seenAppIds = new Set<string>()
 
   for (const library of libraries) {
     const steamappsDir = join(library, 'steamapps')
@@ -253,6 +262,7 @@ async function scanSteam(
       if (!match) continue
       const appId = match[1]
       if (STEAM_NOISE_APP_IDS.has(appId)) continue
+      if (seenAppIds.has(appId)) continue
 
       try {
         const manifest = parseVdf(readFileSync(join(steamappsDir, file), 'utf-8'))
@@ -283,6 +293,11 @@ async function scanSteam(
           alreadyImported: existingSteamAppIds.has(appId),
           likelyRelevant: true
         })
+        // Erst hier vormerken, nicht schon oben: eine zurückgelassene
+        // Verwaltungsdatei ohne echten Spielordner (siehe existsSync weiter
+        // oben) würde sonst den gültigen Eintrag in der anderen Bibliothek
+        // blockieren.
+        seenAppIds.add(appId)
       } catch {
         skipped.push(`Steam: ${file} konnte nicht gelesen werden.`)
         continue
@@ -695,43 +710,57 @@ async function scanGog(
   return { candidates, skipped }
 }
 
-function runPowerShell(command: string): Promise<string> {
-  return new Promise((resolve) => {
-    let stdout = ''
-    try {
-      const child = spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', command], {
-        windowsHide: true
-      })
-      child.stdout.on('data', (chunk) => (stdout += chunk.toString()))
-      child.on('error', () => resolve(''))
-      child.on('close', () => resolve(stdout))
-    } catch {
-      resolve('')
-    }
-  })
-}
-
 interface AppxPackage {
   PackageFamilyName: string
   InstallLocation: string
   Name: string
 }
 
+// Windows führt alle installierten Store-/UWP-Pakete in der Registry. Das ist
+// dieselbe Quelle, aus der auch Get-AppxPackage liest — aber ohne dafür eine
+// PowerShell starten zu müssen, was von Virenscannern deutlich kritischer
+// bewertet wird als ein simpler Registry-Zugriff (siehe runReg oben).
+const APPX_PACKAGES_KEY =
+  'HKCU\\Software\\Classes\\Local Settings\\Software\\Microsoft\\Windows\\CurrentVersion\\AppModel\\Repository\\Packages'
+
+// Der Schlüsselname ist der vollständige Paketname
+// (Name_Version_Architektur_Ressource_Herausgeber). Die im Start-Befehl
+// benötigte "Family Name" besteht aus dem ersten und dem letzten Teil davon.
+function packageFamilyName(fullName: string): string | null {
+  const parts = fullName.split('_')
+  if (parts.length < 2) return null
+  const name = parts[0]
+  const publisherId = parts[parts.length - 1]
+  if (!name || !publisherId) return null
+  return `${name}_${publisherId}`
+}
+
 async function listAppxPackages(): Promise<AppxPackage[]> {
-  const output = await runPowerShell(
-    'Get-AppxPackage | Select-Object PackageFamilyName, InstallLocation, Name | ConvertTo-Json -Compress'
-  )
-  if (!output.trim()) return []
-  try {
-    const parsed = JSON.parse(output)
-    const list = Array.isArray(parsed) ? parsed : [parsed]
-    return list.filter(
-      (entry): entry is AppxPackage =>
-        !!entry && typeof entry.PackageFamilyName === 'string' && typeof entry.InstallLocation === 'string'
-    )
-  } catch {
-    return []
+  const output = await runReg(['query', APPX_PACKAGES_KEY, '/s', '/v', 'PackageRootFolder'])
+  const packages: AppxPackage[] = []
+  let currentFullName: string | null = null
+
+  for (const line of output.split(/\r?\n/)) {
+    if (!line.startsWith(' ') && line.includes('\\Packages\\')) {
+      const rest = line.split('\\Packages\\')[1]
+      currentFullName = rest ? rest.split('\\')[0] : null
+      continue
+    }
+    if (!currentFullName) continue
+    const match = line.match(/^\s+PackageRootFolder\s+REG_SZ\s+(.+?)\s*$/)
+    if (!match) continue
+    const family = packageFamilyName(currentFullName)
+    if (family) {
+      packages.push({
+        PackageFamilyName: family,
+        InstallLocation: match[1],
+        Name: currentFullName.split('_')[0]
+      })
+    }
+    currentFullName = null
   }
+
+  return packages
 }
 
 interface XboxManifestInfo {
@@ -960,6 +989,17 @@ async function importCandidates(candidates: Candidate[]): Promise<Entry[]> {
       hidden: false,
       notes: null
     })
+
+    // Die Sperrlisten mitwachsen lassen. Ohne das prüft jeder Kandidat nur
+    // gegen den Bestand von vor dem Import — kommen zwei gleiche Spiele im
+    // selben Durchlauf (z. B. dieselbe Steam-App in zwei Bibliotheksordnern),
+    // rutschen beide durch und der Eintrag steht doppelt in der Bibliothek.
+    if (candidate.steamAppId) existingSteamAppIds.add(candidate.steamAppId)
+    if (candidate.epicAppName) existingEpicAppNames.add(candidate.epicAppName)
+    if (candidate.battlenetCode) existingBattlenetCodes.add(candidate.battlenetCode)
+    if (candidate.ubisoftId) existingUbisoftIds.add(candidate.ubisoftId)
+    if (candidate.xboxAumid) existingXboxAumids.add(candidate.xboxAumid)
+    existingPaths.add(candidate.path)
   }
 
   // Frisch lesen statt der eingangs geholten `entries`-Momentaufnahme zu

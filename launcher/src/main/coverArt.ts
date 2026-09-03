@@ -1,16 +1,14 @@
-import { ipcMain, nativeImage, type BrowserWindow } from 'electron'
+import { dialog, ipcMain, nativeImage, type BrowserWindow } from 'electron'
 import { promises as fs } from 'fs'
 import { getStore, setEntries, setSettings, type Entry } from './store'
-import { hashPath, iconFilePath, removeCachedIcon } from './icons'
+import { hashPath, iconFilePath, removeCachedIcon, setCustomIcon } from './icons'
+// Adresse des eigenen Proxys (siehe src/main/config.ts und metadata-proxy/) —
+// hält den echten SteamGridDB-Key serverseitig, damit nicht jeder Nutzer selbst
+// einen anlegen muss. Ist kein Proxy konfiguriert, bleibt alles wie zuvor:
+// jeder trägt seinen eigenen, kostenlosen Key ein.
+import { METADATA_PROXY_URL } from './config'
 
 const DIRECT_API_BASE = 'https://www.steamgriddb.com/api/v2'
-
-// Zur Build-Zeit fest eingebackene Adresse eines eigenen Proxys (siehe
-// metadata-proxy/ und electron.vite.config.ts) — hält den echten SteamGridDB-
-// Key serverseitig, damit nicht jeder Nutzer selbst einen anlegen muss. Ohne
-// gesetzten Proxy (leerer String im Build) bleibt alles wie zuvor: jeder
-// trägt seinen eigenen, kostenlosen Key ein.
-const METADATA_PROXY_URL = process.env.METADATA_PROXY_URL || null
 
 interface SteamGridDbSearchResult {
   success: boolean
@@ -78,6 +76,11 @@ function significantWords(name: string): Set<string> {
     name
       .toLowerCase()
       .replace(/[™®©]/g, '')
+      // Genitiv-Endung zuerst entfernen: sonst zerfällt "Sid Meier's" in
+      // "meier" + "s", und dieses bedeutungslose "s" zählt als eigenes Wort
+      // gegen die Übereinstimmung.
+      .replace(/['’`]s\b/g, '')
+      .replace(/['’`]/g, '')
       .replace(/[^a-z0-9]+/g, ' ')
       .split(' ')
       // length > 0 statt > 1 — sonst fallen einstellige Fortsetzungsnummern
@@ -97,7 +100,72 @@ export function namesLikelyMatch(searched: string, candidate: string): boolean {
   if (a.size === 0 || b.size === 0) return true
   const intersection = [...a].filter((word) => b.has(word)).length
   const union = new Set([...a, ...b]).size
-  return intersection / union >= 0.5
+  if (intersection / union >= 0.5) return true
+
+  // Zusätzlich gilt als Treffer, wenn der kürzere Name vollständig im längeren
+  // steckt: Launcher führen Spiele oft mit Herausgeber-Vorsatz ("Tom Clancy's
+  // The Division 2"), während sie in der Cover-Datenbank unter dem kurzen Namen
+  // stehen. Rein anteilig gerechnet fallen solche Paare knapp durch, obwohl es
+  // dasselbe Spiel ist. Erst ab zwei Wörtern, damit ein einzelnes gemeinsames
+  // Wort nicht reicht (siehe "Bigger Beginnings" oben).
+  const shorter = a.size <= b.size ? a : b
+  if (shorter.size >= 2 && intersection === shorter.size) return true
+
+  // Letzter Weg: fast identische Schreibweise. Die Suche von SteamGridDB
+  // verzeiht Tippfehler und liefert dann den richtigen Titel — ein reiner
+  // Wortvergleich verwirft ihn aber, weil "sumble" und "stumble" zwei
+  // verschiedene Wörter sind. Enthaltene Zahlen müssen exakt übereinstimmen,
+  // sonst würde hier "Far Cry 5" auf "Far Cry 3" passen.
+  return charactersNearlyEqual(searched, candidate)
+}
+
+function normalizeForCompare(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[™®©]/g, '')
+    .replace(/['’`]/g, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+    .replace(/\s+/g, ' ')
+}
+
+function digitGroups(name: string): string {
+  return (name.match(/\d+/g) ?? []).join(',')
+}
+
+// Levenshtein-Distanz: wie viele einzelne Zeichen müssen geändert werden, um
+// von einem Text zum anderen zu kommen. Bewusst selbst geschrieben statt als
+// Abhängigkeit — es sind ein paar Zeilen und das Projekt kommt ohne
+// Fremdbibliotheken aus.
+function editDistance(a: string, b: string): number {
+  if (a === b) return 0
+  if (a.length === 0) return b.length
+  if (b.length === 0) return a.length
+
+  let previous = Array.from({ length: b.length + 1 }, (_, index) => index)
+  for (let i = 1; i <= a.length; i++) {
+    const current = [i]
+    for (let j = 1; j <= b.length; j++) {
+      current[j] = Math.min(
+        previous[j] + 1,
+        current[j - 1] + 1,
+        previous[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)
+      )
+    }
+    previous = current
+  }
+  return previous[b.length]
+}
+
+function charactersNearlyEqual(searched: string, candidate: string): boolean {
+  const a = normalizeForCompare(searched)
+  const b = normalizeForCompare(candidate)
+  if (!a || !b) return false
+  if (digitGroups(a) !== digitGroups(b)) return false
+  const longest = Math.max(a.length, b.length)
+  // Sehr kurze Namen sind zu leicht zu verwechseln ("Rust"/"Rust").
+  if (longest < 6) return false
+  return 1 - editDistance(a, b) / longest >= 0.85
 }
 
 async function searchGameId(name: string, apiKey: string | null): Promise<number | null> {
@@ -160,7 +228,11 @@ async function downloadAndCache(entryId: string, imageUrl: string, kind: string)
   return hash
 }
 
-export async function fetchCoverArt(entryId: string): Promise<Entry[]> {
+// searchName erlaubt es, unter einem abweichenden Titel zu suchen: manche
+// Spiele heißen in der Cover-Datenbank schlicht anders ("PUBG" statt
+// "PLAYERUNKNOWN'S BATTLEGROUNDS", englische statt deutscher Titel), und
+// manuell hinzugefügte Programme tragen oft nur ihren Dateinamen.
+export async function fetchCoverArt(entryId: string, searchName?: string): Promise<Entry[]> {
   const apiKey = getApiKey()
   if (!apiKey && !METADATA_PROXY_URL) {
     throw new Error('Kein SteamGridDB-Key hinterlegt. Über "…" → "SteamGridDB-Key…" eintragen.')
@@ -173,20 +245,22 @@ export async function fetchCoverArt(entryId: string): Promise<Entry[]> {
     throw new Error('Eintrag wurde nicht gefunden.')
   }
 
+  const nameToSearch = searchName?.trim() || entry.name
+
   // fetch() wirft bei einem reinen Netzwerkproblem (kein DNS, Firewall,
   // Timeout) eine technische "fetch failed"-Meldung ohne HTTP-Status — hier
   // in eine verständliche Meldung übersetzen, statt sie roh durchzureichen.
   let gameId: number | null
   let gridUrl: string | null
   try {
-    gameId = await searchGameId(entry.name, apiKey)
+    gameId = await searchGameId(nameToSearch, apiKey)
   } catch (error) {
     throw new Error(
       `Verbindung zu SteamGridDB fehlgeschlagen (${error instanceof Error ? error.message : String(error)}).`
     )
   }
   if (!gameId) {
-    throw new Error(`Kein SteamGridDB-Eintrag für "${entry.name}" gefunden.`)
+    throw new Error(`Kein SteamGridDB-Eintrag für "${nameToSearch}" gefunden.`)
   }
   try {
     gridUrl = await fetchGridUrl(gameId, apiKey)
@@ -196,7 +270,7 @@ export async function fetchCoverArt(entryId: string): Promise<Entry[]> {
     )
   }
   if (!gridUrl) {
-    throw new Error(`Für "${entry.name}" gibt es dort kein Cover-Bild.`)
+    throw new Error(`Für "${nameToSearch}" gibt es dort kein Cover-Bild.`)
   }
 
   let newCoverHash: string
@@ -327,6 +401,47 @@ export async function fetchCoverArtForSelected(window: BrowserWindow, ids: strin
   await fetchCoverArtForIdsWithStatus(window, ids)
 }
 
+// Letzte Rettung, wenn es in der Datenbank schlicht kein passendes Bild gibt:
+// ein selbst gewähltes Bild als Cover setzen. Das Bild wird über nativeImage
+// eingelesen und als PNG neu geschrieben — es landet also nie eine unbesehene
+// Fremddatei im Cache.
+export async function pickCustomCover(window: BrowserWindow, entryId: string): Promise<Entry[]> {
+  const entries = getStore().get('entries')
+  const entry = entries.find((e) => e.id === entryId)
+  if (!entry) {
+    throw new Error('Eintrag wurde nicht gefunden.')
+  }
+
+  const result = await dialog.showOpenDialog(window, {
+    title: 'Cover-Bild auswählen',
+    properties: ['openFile'],
+    filters: [{ name: 'Bilder', extensions: ['png', 'jpg', 'jpeg', 'webp', 'bmp'] }]
+  })
+  if (result.canceled || result.filePaths.length === 0) return entries
+
+  const newHash = await setCustomIcon(entryId, result.filePaths[0])
+  if (!newHash) {
+    throw new Error('Das Bild konnte nicht gelesen werden.')
+  }
+
+  const oldHash = entry.coverHash
+  const latest = getStore().get('entries')
+  const updated = latest.map((e) => (e.id === entryId ? { ...e, coverHash: newHash } : e))
+  setEntries(updated)
+
+  // Altes Bild nur löschen, wenn es wirklich nirgends mehr verwendet wird —
+  // dieselbe Datei kann auch als Icon oder Hintergrundbild eines anderen
+  // Eintrags dienen.
+  const stillUsed = updated.some(
+    (e) => e.coverHash === oldHash || e.iconHash === oldHash || e.heroHash === oldHash
+  )
+  if (oldHash && !stillUsed) {
+    await removeCachedIcon(oldHash)
+  }
+
+  return updated
+}
+
 export function registerCoverArtHandlers(getWindow: () => BrowserWindow | null): void {
   ipcMain.handle('coverArt:get', () => getApiKey())
 
@@ -334,7 +449,17 @@ export function registerCoverArtHandlers(getWindow: () => BrowserWindow | null):
     setApiKey(key)
   })
 
-  ipcMain.handle('coverArt:fetch', (_event, entryId: string) => fetchCoverArt(entryId))
+  ipcMain.handle('coverArt:fetch', (_event, entryId: string, searchName?: string) =>
+    fetchCoverArt(entryId, searchName)
+  )
+
+  ipcMain.handle('coverArt:pickCustom', (_event, entryId: string) => {
+    const window = getWindow()
+    if (!window) {
+      throw new Error('Kein Fenster verfügbar.')
+    }
+    return pickCustomCover(window, entryId)
+  })
   ipcMain.handle('coverArt:hasProxy', () => hasProxyConfigured())
   ipcMain.handle('coverArt:fetchAllMissing', async () => {
     const window = getWindow()

@@ -107,7 +107,10 @@ const api = {
   getCoverArtKey: (): Promise<string | null> => ipcRenderer.invoke('coverArt:get'),
   setCoverArtKey: (key: string): Promise<void> => ipcRenderer.invoke('coverArt:set', key),
   hasCoverArtProxy: (): Promise<boolean> => ipcRenderer.invoke('coverArt:hasProxy'),
-  fetchCoverArt: (id: string): Promise<Entry[]> => ipcRenderer.invoke('coverArt:fetch', id),
+  fetchCoverArt: (id: string, searchName?: string): Promise<Entry[]> =>
+    ipcRenderer.invoke('coverArt:fetch', id, searchName),
+  pickCustomCover: (id: string): Promise<Entry[]> =>
+    ipcRenderer.invoke('coverArt:pickCustom', id),
   fetchAllMissingCoverArt: (): Promise<void> => ipcRenderer.invoke('coverArt:fetchAllMissing'),
   fetchCoverArtForSelected: (ids: string[]): Promise<void> =>
     ipcRenderer.invoke('coverArt:fetchForSelected', ids),

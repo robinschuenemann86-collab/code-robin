@@ -570,9 +570,17 @@ function App(): ReactElement {
     setEntries(await window.api.clearEmulatorPath(id))
   }
 
-  async function handleFetchCoverArt(id: string): Promise<void> {
+  async function handleFetchCoverArt(id: string, searchName?: string): Promise<void> {
     try {
-      setEntries(await window.api.fetchCoverArt(id))
+      setEntries(await window.api.fetchCoverArt(id, searchName))
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : String(error))
+    }
+  }
+
+  async function handlePickCustomCover(id: string): Promise<void> {
+    try {
+      setEntries(await window.api.pickCustomCover(id))
     } catch (error) {
       setStatus(error instanceof Error ? error.message : String(error))
     }
@@ -1444,6 +1452,7 @@ function App(): ReactElement {
             onToggleTag={handleToggleTag}
             onChangeIcon={handleChangeIcon}
             onFetchCoverArt={handleFetchCoverArt}
+            onPickCustomCover={handlePickCustomCover}
             onToggleFavorite={handleToggleFavorite}
             onSetRating={handleSetRating}
             onRemove={handleDelete}

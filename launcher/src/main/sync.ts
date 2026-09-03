@@ -1,10 +1,11 @@
 import { ipcMain } from 'electron'
 import { randomUUID } from 'crypto'
 import { getStore, setEntries, setSettings, setTags, type Entry, type Tag } from './store'
+import { METADATA_PROXY_URL } from './config'
 
-// Derselbe Worker wie für den Cover-Art-Proxy (siehe coverArt.ts) — bewusst
-// keine zweite Umgebungsvariable, um die Einrichtung nicht zu verkomplizieren.
-const SYNC_BASE_URL = process.env.METADATA_PROXY_URL || null
+// Derselbe Dienst wie für die Cover-Art (siehe coverArt.ts und config.ts) —
+// bewusst keine zweite Adresse, um die Einrichtung nicht zu verkomplizieren.
+const SYNC_BASE_URL = METADATA_PROXY_URL
 
 interface SyncEntry {
   matchKey: string

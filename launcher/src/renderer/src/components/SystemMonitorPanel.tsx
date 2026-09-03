@@ -1,7 +1,6 @@
 import { useEffect, useState, type ReactElement } from 'react'
 import type { SystemStats } from '../../../main/systemMonitor'
 import { IconX } from './icons'
-import { useEscapeToClose } from '../hooks'
 
 interface SystemMonitorPanelProps {
   onClose: () => void
@@ -62,7 +61,7 @@ function RadialGauge({
           {percent === null ? '–' : `${percent}%`}
         </div>
       </div>
-      <span className="font-display text-[10px] font-bold tracking-wider text-text-muted">
+      <span className="font-display text-[11px] font-bold tracking-wider text-text-muted">
         {label}
       </span>
       {sublabel && <span className="text-[10px] text-text-muted">{sublabel}</span>}
@@ -70,27 +69,67 @@ function RadialGauge({
   )
 }
 
-// Reines Anzeige-Widget, holt sich seine Werte selbst per Intervall — läuft
-// nur, solange dieses Panel offen ist (kein main-process-Timer im
-// Hintergrund), und zeigt ausschließlich Werte des laufenden Rechners, nie
-// etwas aus einem gestarteten Spiel selbst.
+// Reines Anzeige-Widget, holt seine Werte selbst — aber nur, solange das Panel
+// offen UND das Fenster sichtbar ist. Zeigt ausschließlich Werte des laufenden
+// Rechners, nie etwas aus einem gestarteten Spiel.
+//
+// Bewusst kein Escape-zum-Schließen: das Panel ist kein Dialog, sondern bleibt
+// neben anderen Fenstern offen. Mit einem eigenen Escape-Horcher würde es sich
+// mitschließen, sobald man irgendeinen Dialog per Escape wegklickt.
 export function SystemMonitorPanel({ onClose }: SystemMonitorPanelProps): ReactElement {
   const [stats, setStats] = useState<SystemStats | null>(null)
-
-  useEscapeToClose(onClose)
+  const [failed, setFailed] = useState(false)
 
   useEffect(() => {
     let cancelled = false
-    function poll(): void {
-      window.api.getSystemStats().then((result) => {
-        if (!cancelled) setStats(result)
-      })
+    let timer: ReturnType<typeof setTimeout> | null = null
+
+    // Erst nach dem Ergebnis neu einplanen statt in festem Takt: dauert eine
+    // Messung länger als das Intervall, würden sich sonst immer mehr parallele
+    // Abfragen (und deren Hintergrundprozesse) überlagern.
+    function scheduleNext(): void {
+      if (cancelled) return
+      timer = setTimeout(poll, POLL_INTERVAL_MS)
     }
+
+    function poll(): void {
+      if (cancelled) return
+      // Im Hintergrund (minimiert oder im Infobereich) nicht messen — sonst
+      // laufen die Abfragen ausgerechnet während des Spielens weiter.
+      if (document.visibilityState === 'hidden') {
+        scheduleNext()
+        return
+      }
+      window.api
+        .getSystemStats()
+        .then((result) => {
+          if (cancelled) return
+          setStats(result)
+          setFailed(false)
+        })
+        .catch(() => {
+          // Ohne diesen Zweig bliebe die letzte Messung stehen und wirkte wie
+          // ein aktueller Wert, obwohl längst nichts mehr aktualisiert wird.
+          if (cancelled) return
+          setStats(null)
+          setFailed(true)
+        })
+        .finally(scheduleNext)
+    }
+
+    function onVisibilityChange(): void {
+      if (document.visibilityState === 'visible' && !cancelled) {
+        if (timer) clearTimeout(timer)
+        poll()
+      }
+    }
+
     poll()
-    const interval = setInterval(poll, POLL_INTERVAL_MS)
+    document.addEventListener('visibilitychange', onVisibilityChange)
     return () => {
       cancelled = true
-      clearInterval(interval)
+      if (timer) clearTimeout(timer)
+      document.removeEventListener('visibilitychange', onVisibilityChange)
     }
   }, [])
 
@@ -99,6 +138,7 @@ export function SystemMonitorPanel({ onClose }: SystemMonitorPanelProps): ReactE
       <button onClick={onClose} title="Schließen" className="self-end text-text-muted hover:text-gold">
         <IconX className="h-3.5 w-3.5" />
       </button>
+      {failed && <span className="text-[10px] text-amber">Messung nicht möglich</span>}
       <RadialGauge
         percent={stats?.cpuPercent ?? null}
         label="CPU"

@@ -1,5 +1,6 @@
 import { spawn } from 'child_process'
 import { randomUUID } from 'crypto'
+import { join } from 'path'
 import { Notification } from 'electron'
 import { getStore, setSessionArchive, setSessions, setSettings, type Session } from './store'
 import { clearDiscordPresence, setDiscordPresence } from './discordPresence'
@@ -34,23 +35,45 @@ export function setBreakReminderMinutes(minutes: number | null): void {
   setSettings({ ...getStore().get('settings'), breakReminderMinutes: minutes })
 }
 
-function getRunningProcessNames(): Promise<Set<string>> {
+// Absoluter Pfad statt bloßem Namen: bei einem bloßen Namen sucht Windows
+// zuerst im Programm- und Arbeitsverzeichnis, eine dort abgelegte gleichnamige
+// Datei würde also statt des echten Werkzeugs ausgeführt.
+const TASKLIST = join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'tasklist.exe')
+
+// Fragt gezielt nach genau einem Prozessnamen, statt die vollständige
+// Prozessliste des Rechners zu holen und darin zu suchen. Inhaltlich dasselbe
+// Ergebnis, aber das Programm liest nicht mehr bei jeder Messung mit, was sonst
+// noch alles auf dem Rechner läuft — das ist ein Verhalten, das die
+// Verhaltensüberwachung von Virenscannern zu Recht misstrauisch beäugt.
+function isProcessRunning(imageName: string): Promise<boolean> {
   return new Promise((resolve) => {
+    // Der /fi-Filter hat eine eigene Syntax; ungewöhnliche Zeichen würden ihn
+    // stillschweigend unbrauchbar machen. Ausgeführt wird hier ohnehin nichts
+    // davon — der Name landet als einzelnes Argument, nie in einer Shell.
+    if (!/^[\w .+-]+\.exe$/i.test(imageName)) {
+      resolve(false)
+      return
+    }
     let stdout = ''
+    const expected = `"${imageName.toLowerCase()}"`
     try {
-      const child = spawn('tasklist', ['/fo', 'csv', '/nh'], { windowsHide: true })
+      const child = spawn(TASKLIST, ['/nh', '/fo', 'csv', '/fi', `IMAGENAME eq ${imageName}`], {
+        windowsHide: true,
+        stdio: ['ignore', 'pipe', 'ignore']
+      })
       child.stdout.on('data', (chunk) => (stdout += chunk.toString()))
-      child.on('error', () => resolve(new Set()))
+      child.on('error', () => resolve(false))
       child.on('close', () => {
-        const names = new Set<string>()
-        for (const line of stdout.split(/\r?\n/)) {
-          const match = line.match(/^"([^"]+)"/)
-          if (match) names.add(match[1].toLowerCase())
-        }
-        resolve(names)
+        // Treffer ist eine CSV-Zeile, die mit dem Namen beginnt. Ohne Treffer
+        // gibt tasklist einen übersetzten Hinweistext aus, der hier nicht passt.
+        resolve(
+          stdout
+            .split(/\r?\n/)
+            .some((line) => line.trim().toLowerCase().startsWith(expected))
+        )
       })
     } catch {
-      resolve(new Set())
+      resolve(false)
     }
   })
 }
@@ -117,7 +140,22 @@ async function pollTick(): Promise<void> {
   }
 
   const entries = getStore().get('entries')
-  const runningNames = await getRunningProcessNames()
+
+  // Nur die Prozessnamen abfragen, die für die gerade offenen Sitzungen
+  // überhaupt gebraucht werden — im Normalfall also genau einer.
+  const neededNames = new Set<string>()
+  for (const session of openSessions) {
+    const entry = entries.find((e) => e.id === session.entryId)
+    const name = entry?.expectedProcessName?.toLowerCase()
+    if (name) neededNames.add(name)
+  }
+  const runningNames = new Set<string>()
+  await Promise.all(
+    [...neededNames].map(async (name) => {
+      if (await isProcessRunning(name)) runningNames.add(name)
+    })
+  )
+
   const now = Date.now()
   const reminderMinutes = getBreakReminderMinutes()
   let changed = false

@@ -18,9 +18,12 @@ win:
   # description) und dem copyright oben — nicht aus einem eigenen Feld hier.
   # win.publisherName gibt es seit electron-builder 26 nicht mehr; es lebt
   # jetzt unter signtoolOptions und betrifft nur die Signaturpruefung.
+  # Bewusst nur noch der Installer: die portable Variante entpackt sich beim
+  # Start selbst in den Temp-Ordner und führt sich von dort aus — genau das
+  # Muster, das Virenscanner unabhängig vom Inhalt als typisch für Schadsoftware
+  # bewerten. Der Installer installiert dagegen sichtbar und ortsfest.
   target:
     - nsis
-    - portable
 nsis:
   # Bewusst ohne Versionsnummer im Dateinamen: dadurch funktioniert
   # https://github.com/<owner>/<repo>/releases/latest/download/MR-Launch-Setup.exe
@@ -36,8 +39,6 @@ nsis:
   oneClick: false
   allowToChangeInstallationDirectory: true
   createDesktopShortcut: always
-portable:
-  artifactName: ${name}-${version}-portable.${ext}
 mac:
   entitlementsInherit: build/entitlements.mac.plist
   extendInfo:

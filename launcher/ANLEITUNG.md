@@ -45,6 +45,11 @@ zuverlässig auslesen — fehlt sie, bleibt einfach nur die Prozentanzeige übri
 - Für die meisten Spiele wird automatisch ein Cover-Bild geladen. Fehlt eins,
   hilft "Fehlende Cover-Art nachladen" im "…"-Menü oben rechts, um es für alle
   betroffenen Programme auf einmal nachzuholen.
+- Findet er trotzdem keins, geht es im Detail-Panel direkt unter dem Bild von
+  Hand: **"anderer Name …"** sucht unter einem abweichenden Titel (z. B. `PUBG`
+  statt `PLAYERUNKNOWN'S BATTLEGROUNDS` oder der englische statt des deutschen
+  Titels), **"eigenes Bild …"** setzt ein selbst heruntergeladenes Bild als
+  Cover.
 
 ## Start-Skripte & Emulatoren
 

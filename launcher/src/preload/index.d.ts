@@ -69,7 +69,8 @@ export interface LauncherApi {
   getCoverArtKey: () => Promise<string | null>
   setCoverArtKey: (key: string) => Promise<void>
   hasCoverArtProxy: () => Promise<boolean>
-  fetchCoverArt: (id: string) => Promise<Entry[]>
+  fetchCoverArt: (id: string, searchName?: string) => Promise<Entry[]>
+  pickCustomCover: (id: string) => Promise<Entry[]>
   fetchAllMissingCoverArt: () => Promise<void>
   fetchCoverArtForSelected: (ids: string[]) => Promise<void>
   onOpenCoverArtKeyDialog: (callback: () => void) => () => void
